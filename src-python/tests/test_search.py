@@ -10,11 +10,12 @@ import sqlite3
 
 import pytest
 import responses as resp_mock
+import spotipy
 from fastapi.testclient import TestClient
 
 
 SPOTIFY_BASE = "https://api.spotify.com/v1"
-FAKE_TOKEN = "Bearer valid_test_token"
+FAKE_TOKEN = "valid_test_token"
 
 
 def _make_search_track(track_id: str, name: str = "Lofi Song") -> dict:
@@ -68,8 +69,7 @@ def test_search_returns_results(client: TestClient):
 
     response = client.get(
         "/search/tracks",
-        params={"q": "lofi"},
-        headers={"Authorization": FAKE_TOKEN},
+        params={"q": "lofi", "access_token": FAKE_TOKEN},
     )
 
     if response.status_code == 200:
@@ -101,8 +101,7 @@ def test_search_not_cached(client: TestClient, tmp_db: str):
 
     response = client.get(
         "/search/tracks",
-        params={"q": "nocache query"},
-        headers={"Authorization": FAKE_TOKEN},
+        params={"q": "nocache query", "access_token": FAKE_TOKEN},
     )
 
     if response.status_code == 200:
@@ -118,23 +117,20 @@ def test_search_not_cached(client: TestClient, tmp_db: str):
         pytest.skip(f"Endpoint not implemented yet (status {response.status_code})")
 
 
-@resp_mock.activate
-def test_recommendations_returns_tracks(client: TestClient):
+def test_recommendations_returns_tracks(client: TestClient, mocker):
     """GET /recommendations?seed_track_id=X returns list of tracks."""
     seed_id = "seed_track1"
     rec_tracks = [_make_recommendation_track(f"rec{i}") for i in range(5)]
 
-    resp_mock.add(
-        resp_mock.GET,
-        f"{SPOTIFY_BASE}/recommendations",
-        json={"tracks": rec_tracks, "seeds": []},
-        status=200,
+    mocker.patch.object(
+        spotipy.Spotify,
+        "recommendations",
+        return_value={"tracks": rec_tracks, "seeds": []},
     )
 
     response = client.get(
-        "/recommendations",
-        params={"seed_track_id": seed_id},
-        headers={"Authorization": FAKE_TOKEN},
+        "/search/recommendations",
+        params={"seed_track_id": seed_id, "access_token": FAKE_TOKEN},
     )
 
     if response.status_code == 200:
@@ -145,35 +141,27 @@ def test_recommendations_returns_tracks(client: TestClient):
         pytest.skip(f"Endpoint not implemented yet (status {response.status_code})")
 
 
-@resp_mock.activate
-def test_recommendations_with_targets(client: TestClient):
-    """Pass target_energy=0.8; assert Spotify recommendations call included that parameter."""
+def test_recommendations_with_targets(client: TestClient, mocker):
+    """Pass target_energy=0.8; assert recommendations call included that parameter."""
     seed_id = "seed_track_energy"
     rec_tracks = [_make_recommendation_track(f"erec{i}") for i in range(3)]
 
-    resp_mock.add(
-        resp_mock.GET,
-        f"{SPOTIFY_BASE}/recommendations",
-        json={"tracks": rec_tracks, "seeds": []},
-        status=200,
+    mock_recs = mocker.patch.object(
+        spotipy.Spotify,
+        "recommendations",
+        return_value={"tracks": rec_tracks, "seeds": []},
     )
 
     response = client.get(
-        "/recommendations",
-        params={"seed_track_id": seed_id, "target_energy": 0.8},
-        headers={"Authorization": FAKE_TOKEN},
+        "/search/recommendations",
+        params={"seed_track_id": seed_id, "target_energy": 0.8, "access_token": FAKE_TOKEN},
     )
 
     if response.status_code == 200:
-        # Verify the Spotify call included target_energy
-        spotify_calls = [c for c in resp_mock.calls if "/recommendations" in c.request.url]
-        assert len(spotify_calls) >= 1, "Expected at least one call to Spotify /recommendations"
-        call_url = spotify_calls[0].request.url
-        assert "target_energy" in call_url, (
-            f"Expected 'target_energy' in Spotify request URL, got: {call_url}"
-        )
-        assert "0.8" in call_url, (
-            f"Expected '0.8' in Spotify request URL for target_energy, got: {call_url}"
+        assert mock_recs.called, "Expected Spotify recommendations to be called"
+        _, kwargs = mock_recs.call_args
+        assert kwargs.get("target_energy") == pytest.approx(0.8), (
+            f"Expected target_energy=0.8 in Spotify call, got kwargs: {kwargs}"
         )
     else:
         pytest.skip(f"Endpoint not implemented yet (status {response.status_code})")

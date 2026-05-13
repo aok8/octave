@@ -27,6 +27,7 @@ from db import (
     upsert_playlist,
     upsert_playlist_track,
     upsert_track,
+    upsert_user,
 )
 from spotify_client import get_client
 
@@ -152,12 +153,22 @@ def get_playlists(
         sp = get_client(access_token)
         me = sp.current_user()
         user_id: str = me["id"]
+        conn_user = get_db()
+        try:
+            upsert_user(conn_user, me)
+        finally:
+            conn_user.close()
     except spotipy.SpotifyException as exc:
         status = exc.http_status if hasattr(exc, "http_status") else 500
         if status == 401:
             raise HTTPException(status_code=401, detail="Invalid or expired Spotify token")
         raise HTTPException(status_code=status, detail=str(exc))
+    except HTTPException:
+        raise
     except Exception as exc:
+        exc_str = str(exc)
+        if "401" in exc_str:
+            raise HTTPException(status_code=401, detail="Invalid or expired Spotify token")
         raise HTTPException(status_code=500, detail=f"Spotify client error: {exc}")
 
     conn = get_db()

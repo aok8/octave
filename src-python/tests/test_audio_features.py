@@ -9,12 +9,12 @@ import json
 import sqlite3
 
 import pytest
-import responses as resp_mock
+import spotipy
 from fastapi.testclient import TestClient
 
 
 SPOTIFY_BASE = "https://api.spotify.com/v1"
-FAKE_TOKEN = "Bearer valid_test_token"
+FAKE_TOKEN = "valid_test_token"
 
 AUDIO_FEATURE_FIELDS = ("energy", "tempo", "valence", "danceability", "acousticness")
 
@@ -73,23 +73,20 @@ def _seed_audio_features(db_path: str, track_ids: list[str]):
 # ---------------------------------------------------------------------------
 
 
-@resp_mock.activate
-def test_audio_features_batch_fetch(client: TestClient, tmp_db: str):
+def test_audio_features_batch_fetch(client: TestClient, tmp_db: str, mocker):
     """Pass 5 track IDs; assert 5 feature objects returned with correct fields."""
     track_ids = [f"af_track{i}" for i in range(5)]
     _seed_tracks(tmp_db, track_ids)
 
-    resp_mock.add(
-        resp_mock.GET,
-        f"{SPOTIFY_BASE}/audio-features",
-        json={"audio_features": [_make_feature(tid) for tid in track_ids]},
-        status=200,
+    mocker.patch.object(
+        spotipy.Spotify,
+        "audio_features",
+        return_value=[_make_feature(tid) for tid in track_ids],
     )
 
     response = client.get(
         "/tracks/audio-features",
-        params={"track_ids": ",".join(track_ids)},
-        headers={"Authorization": FAKE_TOKEN},
+        params={"track_ids": ",".join(track_ids), "access_token": FAKE_TOKEN},
     )
 
     if response.status_code == 200:
@@ -103,32 +100,26 @@ def test_audio_features_batch_fetch(client: TestClient, tmp_db: str):
         pytest.skip(f"Endpoint not implemented yet (status {response.status_code})")
 
 
-@resp_mock.activate
-def test_audio_features_cache_dedup(client: TestClient, tmp_db: str):
+def test_audio_features_cache_dedup(client: TestClient, tmp_db: str, mocker):
     """Fetch same 5 tracks twice; assert SQLite has exactly 5 rows (no duplicates)."""
     track_ids = [f"dedup_track{i}" for i in range(5)]
     _seed_tracks(tmp_db, track_ids)
 
-    # Register Spotify mock for both calls
-    for _ in range(2):
-        resp_mock.add(
-            resp_mock.GET,
-            f"{SPOTIFY_BASE}/audio-features",
-            json={"audio_features": [_make_feature(tid) for tid in track_ids]},
-            status=200,
-        )
+    mocker.patch.object(
+        spotipy.Spotify,
+        "audio_features",
+        return_value=[_make_feature(tid) for tid in track_ids],
+    )
 
     ids_param = ",".join(track_ids)
 
     r1 = client.get(
         "/tracks/audio-features",
-        params={"track_ids": ids_param},
-        headers={"Authorization": FAKE_TOKEN},
+        params={"track_ids": ids_param, "access_token": FAKE_TOKEN},
     )
     r2 = client.get(
         "/tracks/audio-features",
-        params={"track_ids": ids_param},
-        headers={"Authorization": FAKE_TOKEN},
+        params={"track_ids": ids_param, "access_token": FAKE_TOKEN},
     )
 
     if r1.status_code == 200 and r2.status_code == 200:
@@ -144,8 +135,7 @@ def test_audio_features_cache_dedup(client: TestClient, tmp_db: str):
         pytest.skip(f"Endpoint not implemented yet (r1={r1.status_code}, r2={r2.status_code})")
 
 
-@resp_mock.activate
-def test_audio_features_partial_cache(client: TestClient, tmp_db: str):
+def test_audio_features_partial_cache(client: TestClient, tmp_db: str, mocker):
     """Pre-seed 3 tracks in DB; request 5 (3 cached + 2 new); assert Spotify called with only 2 IDs."""
     cached_ids = [f"cached_track{i}" for i in range(3)]
     new_ids = [f"new_track{i}" for i in range(2)]
@@ -155,27 +145,24 @@ def test_audio_features_partial_cache(client: TestClient, tmp_db: str):
     _seed_audio_features(tmp_db, cached_ids)
 
     # Spotify should only be called for the 2 new tracks
-    resp_mock.add(
-        resp_mock.GET,
-        f"{SPOTIFY_BASE}/audio-features",
-        json={"audio_features": [_make_feature(tid) for tid in new_ids]},
-        status=200,
+    mock_audio = mocker.patch.object(
+        spotipy.Spotify,
+        "audio_features",
+        return_value=[_make_feature(tid) for tid in new_ids],
     )
 
     response = client.get(
         "/tracks/audio-features",
-        params={"track_ids": ",".join(all_ids)},
-        headers={"Authorization": FAKE_TOKEN},
+        params={"track_ids": ",".join(all_ids), "access_token": FAKE_TOKEN},
     )
 
     if response.status_code == 200:
-        spotify_calls = [c for c in resp_mock.calls if "/audio-features" in c.request.url]
-        # Either no Spotify call (all cached) or only IDs not in cache were fetched
-        for call in spotify_calls:
-            url = call.request.url
-            for cid in cached_ids:
-                assert cid not in url, (
-                    f"Cached track '{cid}' should NOT be in Spotify request, but found in: {url}"
-                )
+        # Verify Spotify was called only with the uncached IDs
+        assert mock_audio.called, "Expected Spotify audio_features to be called"
+        called_ids = set(mock_audio.call_args[0][0])
+        for cid in cached_ids:
+            assert cid not in called_ids, (
+                f"Cached track '{cid}' should NOT be in Spotify request"
+            )
     else:
         pytest.skip(f"Endpoint not implemented yet (status {response.status_code})")

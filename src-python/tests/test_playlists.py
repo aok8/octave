@@ -11,6 +11,7 @@ import sqlite3
 
 import pytest
 import responses as resp_mock
+import spotipy
 from fastapi.testclient import TestClient
 
 
@@ -20,7 +21,9 @@ from fastapi.testclient import TestClient
 
 SPOTIFY_BASE = "https://api.spotify.com/v1"
 
-FAKE_TOKEN = "Bearer valid_test_token"
+FAKE_TOKEN = "valid_test_token"
+
+ME_STUB = {"id": "user1", "display_name": "Test User", "email": "test@example.com", "images": []}
 
 PLAYLIST_STUB = {
     "id": "pl1",
@@ -70,18 +73,15 @@ def _make_track_stub(track_id: str, name: str = "Song") -> dict:
 @resp_mock.activate
 def test_playlists_returns_list(client: TestClient):
     """GET /playlists returns a list with correct shape (id, name, cover_url, track_count)."""
+    resp_mock.add(resp_mock.GET, f"{SPOTIFY_BASE}/me/", json=ME_STUB, status=200)
     resp_mock.add(
         resp_mock.GET,
         f"{SPOTIFY_BASE}/me/playlists",
-        json={
-            "items": [PLAYLIST_STUB],
-            "total": 1,
-            "next": None,
-        },
+        json={"items": [PLAYLIST_STUB], "total": 1, "next": None},
         status=200,
     )
 
-    response = client.get("/playlists", headers={"Authorization": FAKE_TOKEN})
+    response = client.get("/playlists", params={"access_token": FAKE_TOKEN})
 
     # The endpoint may not exist yet — we check for either a valid list or a 404/501
     if response.status_code == 200:
@@ -98,23 +98,19 @@ def test_playlists_returns_list(client: TestClient):
 @resp_mock.activate
 def test_playlists_cache_hit(client: TestClient):
     """Second request to GET /playlists must NOT call Spotify API (mock called exactly once)."""
+    resp_mock.add(resp_mock.GET, f"{SPOTIFY_BASE}/me/", json=ME_STUB, status=200)
+    resp_mock.add(resp_mock.GET, f"{SPOTIFY_BASE}/me/", json=ME_STUB, status=200)
     resp_mock.add(
         resp_mock.GET,
         f"{SPOTIFY_BASE}/me/playlists",
-        json={
-            "items": [PLAYLIST_STUB],
-            "total": 1,
-            "next": None,
-        },
+        json={"items": [PLAYLIST_STUB], "total": 1, "next": None},
         status=200,
     )
 
-    r1 = client.get("/playlists", headers={"Authorization": FAKE_TOKEN})
-    r2 = client.get("/playlists", headers={"Authorization": FAKE_TOKEN})
+    r1 = client.get("/playlists", params={"access_token": FAKE_TOKEN})
+    r2 = client.get("/playlists", params={"access_token": FAKE_TOKEN})
 
     if r1.status_code == 200 and r2.status_code == 200:
-        # responses library tracks call count
-        assert resp_mock.assert_call_count(f"{SPOTIFY_BASE}/me/playlists", 1) or True
         # The critical assertion: mock was called at most once (cached on second call)
         playlist_calls = [c for c in resp_mock.calls if "/me/playlists" in c.request.url]
         assert len(playlist_calls) <= 1, (
@@ -124,59 +120,53 @@ def test_playlists_cache_hit(client: TestClient):
         pytest.skip(f"Endpoint not implemented yet (status {r1.status_code})")
 
 
-@resp_mock.activate
-def test_playlist_tracks_pagination(client: TestClient):
+def test_playlist_tracks_pagination(client: TestClient, tmp_db: str, mocker):
     """Mock Spotify to return 2 pages of 50 tracks each; assert response has 100 tracks total."""
     playlist_id = "pl_paginated"
+
+    # Seed users + playlist so FK constraints are satisfied when tracks are upserted
+    conn = sqlite3.connect(tmp_db)
+    conn.execute("INSERT OR IGNORE INTO users (id, display_name) VALUES ('user1', 'Test User')")
+    conn.execute(
+        "INSERT OR IGNORE INTO playlists (id, user_id, name, track_count) VALUES (?, 'user1', 'Paginated PL', 100)",
+        (playlist_id,),
+    )
+    conn.commit()
+    conn.close()
 
     page1_items = [_make_track_stub(f"t{i}") for i in range(50)]
     page2_items = [_make_track_stub(f"t{i+50}") for i in range(50)]
 
-    resp_mock.add(
-        resp_mock.GET,
-        f"{SPOTIFY_BASE}/playlists/{playlist_id}/tracks",
-        json={
-            "items": page1_items,
-            "total": 100,
-            "next": f"{SPOTIFY_BASE}/playlists/{playlist_id}/tracks?offset=50&limit=50",
-            "offset": 0,
-            "limit": 50,
-        },
-        status=200,
-    )
-    resp_mock.add(
-        resp_mock.GET,
-        f"{SPOTIFY_BASE}/playlists/{playlist_id}/tracks",
-        json={
-            "items": page2_items,
-            "total": 100,
-            "next": None,
-            "offset": 50,
-            "limit": 50,
-        },
-        status=200,
-    )
+    page1 = {
+        "items": page1_items,
+        "total": 100,
+        "next": f"{SPOTIFY_BASE}/playlists/{playlist_id}/items?offset=50&limit=50",
+        "offset": 0,
+        "limit": 50,
+    }
+    page2 = {"items": page2_items, "total": 100, "next": None, "offset": 50, "limit": 50}
+
+    # playlist_tracks() delegates to playlist_items(); mock both pages
+    mocker.patch.object(spotipy.Spotify, "playlist_items", return_value=page1)
+    mocker.patch.object(spotipy.Spotify, "next", return_value=page2)
 
     response = client.get(
         f"/playlists/{playlist_id}/tracks",
-        headers={"Authorization": FAKE_TOKEN},
+        params={"access_token": FAKE_TOKEN},
     )
 
     if response.status_code == 200:
         data = response.json()
-        # Accept both a flat list and a dict with a "tracks" key
         tracks = data if isinstance(data, list) else data.get("tracks", data)
         assert len(tracks) == 100, f"Expected 100 tracks, got {len(tracks)}"
     else:
         pytest.skip(f"Endpoint not implemented yet (status {response.status_code})")
 
 
-@resp_mock.activate
-def test_playlist_tracks_upserts_to_db(client: TestClient, tmp_db: str):
+def test_playlist_tracks_upserts_to_db(client: TestClient, tmp_db: str, mocker):
     """After fetching tracks, assert rows exist in SQLite tracks table."""
     playlist_id = "pl_upsert"
 
-    # Spotify also needs the playlist metadata to exist; seed it
     conn = sqlite3.connect(tmp_db)
     conn.execute(
         "INSERT OR IGNORE INTO users (id, display_name) VALUES ('user1', 'Test User')"
@@ -188,22 +178,21 @@ def test_playlist_tracks_upserts_to_db(client: TestClient, tmp_db: str):
     conn.commit()
     conn.close()
 
-    resp_mock.add(
-        resp_mock.GET,
-        f"{SPOTIFY_BASE}/playlists/{playlist_id}/tracks",
-        json={
+    mocker.patch.object(
+        spotipy.Spotify,
+        "playlist_items",
+        return_value={
             "items": [_make_track_stub("upsert_t1"), _make_track_stub("upsert_t2")],
             "total": 2,
             "next": None,
             "offset": 0,
             "limit": 50,
         },
-        status=200,
     )
 
     response = client.get(
         f"/playlists/{playlist_id}/tracks",
-        headers={"Authorization": FAKE_TOKEN},
+        params={"access_token": FAKE_TOKEN},
     )
 
     if response.status_code == 200:
@@ -222,14 +211,14 @@ def test_playlists_401_bad_token(client: TestClient):
     """Pass invalid token; assert 401 response."""
     resp_mock.add(
         resp_mock.GET,
-        f"{SPOTIFY_BASE}/me/playlists",
+        f"{SPOTIFY_BASE}/me/",
         json={"error": {"status": 401, "message": "No token provided"}},
         status=401,
     )
 
-    response = client.get("/playlists", headers={"Authorization": "Bearer bad_token"})
+    response = client.get("/playlists", params={"access_token": "bad_token"})
 
-    if response.status_code in (200, 404, 501):
+    if response.status_code in (404, 501):
         pytest.skip(f"Endpoint not implemented yet (status {response.status_code})")
     else:
         assert response.status_code == 401, (

@@ -36,6 +36,31 @@ def get_db() -> sqlite3.Connection:
 
 
 # ---------------------------------------------------------------------------
+# User helpers
+# ---------------------------------------------------------------------------
+
+
+def upsert_user(conn: sqlite3.Connection, user: dict) -> None:
+    """Insert or replace a user row."""
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO users (id, display_name, email, avatar_url)
+        VALUES (:id, :display_name, :email, :avatar_url)
+        """,
+        {
+            "id": user["id"],
+            "display_name": user.get("display_name") or user["id"],
+            "email": user.get("email"),
+            "avatar_url": next(
+                (img["url"] for img in (user.get("images") or []) if img.get("url")),
+                None,
+            ),
+        },
+    )
+    conn.commit()
+
+
+# ---------------------------------------------------------------------------
 # Playlist helpers
 # ---------------------------------------------------------------------------
 

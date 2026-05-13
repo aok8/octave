@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(python -m pytest*)",
+      "PowerShell(npx vitest*)",
+      "PowerShell(npx tsc*)",
+      "PowerShell(npm run*)",
+      "PowerShell(pip install*)",
+      "PowerShell(git add*)",
+      "PowerShell(git commit*)",
+      "PowerShell(git log*)",
+      "PowerShell(git status*)",
+      "PowerShell(git diff*)",
+      "Bash(python -m pytest*)",
+      "Bash(npx vitest*)",
+      "Bash(npx tsc*)",
+      "Bash(npm run*)",
+      "Bash(pip install*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git log*)",
+      "Bash(git status*)"
+    ]
+  }
+}

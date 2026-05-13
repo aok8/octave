@@ -1,3 +1,10 @@
+pub mod api;
+
+pub use api::{
+    fetch_audio_features, fetch_playlist_tracks, fetch_playlists, fetch_recommendations,
+    search_tracks,
+};
+
 use crate::auth::{self, AuthStateInfo, OAuthState};
 use tauri::State;
 

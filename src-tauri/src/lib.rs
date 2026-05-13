@@ -28,6 +28,11 @@ pub fn run() {
             commands::get_auth_state,
             commands::start_oauth,
             commands::logout,
+            commands::fetch_playlists,
+            commands::fetch_playlist_tracks,
+            commands::fetch_audio_features,
+            commands::search_tracks,
+            commands::fetch_recommendations,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

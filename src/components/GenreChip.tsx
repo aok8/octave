@@ -17,7 +17,7 @@ const GENRE_COLORS: Record<GenreBucket, string> = {
 
 const GENRE_LABELS: Record<GenreBucket, string> = {
   rnb: "R&B",
-  neosoul: "Neo Soul",
+  neosoul: "Neo-Soul",
   hiphop: "Hip-Hop",
   chillpop: "Chill Pop",
   lofi: "Lo-Fi",
@@ -124,3 +124,4 @@ export function GenreChip({
 
 export { GENRE_COLORS, GENRE_LABELS };
 export type { ChipVariant };
+export default GenreChip;

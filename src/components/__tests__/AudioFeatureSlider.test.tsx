@@ -56,36 +56,18 @@ describe('AudioFeatureSlider', () => {
     const { container } = render(
       <AudioFeatureSlider feature="energy" value={0.5} onChange={vi.fn()} />
     );
-    // Energy slider should have orange/red gradient styling
-    const trackEl = container.querySelector(
-      '[data-testid="slider-track"], .slider-track, input[type="range"]'
-    ) as HTMLElement | null;
-    if (trackEl) {
-      const style = trackEl.style.backgroundImage || trackEl.style.background || '';
-      const parentStyle = (trackEl.parentElement?.style?.backgroundImage || '') +
-        (trackEl.parentElement?.style?.background || '');
-      const combinedStyle = style + parentStyle;
-      // Energy should use a warm (orange/red) gradient token
-      // Accept either inline style or a CSS class indicating the gradient
-      const hasGradient =
-        combinedStyle.includes('gradient') ||
-        combinedStyle.includes('orange') ||
-        combinedStyle.includes('red') ||
-        combinedStyle.includes('#f') ||
-        trackEl.className.includes('energy') ||
-        trackEl.className.includes('gradient');
-      expect(hasGradient).toBe(true);
-    } else {
-      // If no slider track element is found, just verify the component renders
-      expect(container.firstChild).not.toBeNull();
-    }
+    // The filled-portion div carries the gradient as an inline background style.
+    // Query any element in the component that uses a CSS gradient.
+    const gradientEl = container.querySelector('[style*="gradient"]') as HTMLElement | null;
+    expect(gradientEl).not.toBeNull();
   });
 
   it('renders tempo with BPM scale (not 0-1)', () => {
     render(<AudioFeatureSlider feature="tempo" value={128} onChange={vi.fn()} />);
-    // Tempo value should display as "128" BPM, not as a normalized "0.64" or similar
-    expect(screen.getByText('128')).toBeInTheDocument();
-    // Should NOT display the value as a decimal between 0-1
+    // The value "128" and " BPM" are separate text nodes inside the same span,
+    // so the span's full text content is "128 BPM". Match with a regex.
+    expect(screen.getByText(/^128/)).toBeInTheDocument();
+    // Should NOT display the value as a normalized decimal between 0-1
     expect(screen.queryByText('0.64')).toBeNull();
     expect(screen.queryByText('0.5')).toBeNull();
   });

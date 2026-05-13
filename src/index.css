@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-base: #121212;
+  --color-surface: rgba(255,255,255,0.06);
+  --color-border: rgba(255,255,255,0.10);
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: rgba(255,255,255,0.60);
+  --color-text-tertiary: rgba(255,255,255,0.35);
+  --genre-rnb: #6A0DAD;
+  --genre-neosoul: #FF914D;
+  --genre-hiphop: #1DB9FF;
+  --genre-chillpop: #FF6FAE;
+  --genre-lofi: #4DB6AC;
+  --genre-nujazz: #FFD93D;
+}
+
+body {
+  background: #121212;
+  color: #fff;
+  margin: 0;
+  padding: 0;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+}

@@ -33,6 +33,7 @@ pub fn run() {
             commands::fetch_audio_features,
             commands::search_tracks,
             commands::fetch_recommendations,
+            commands::fetch_insights,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

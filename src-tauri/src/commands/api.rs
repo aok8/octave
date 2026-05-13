@@ -134,6 +134,25 @@ pub async fn search_tracks(
     check_response(resp).await
 }
 
+/// Fetch audio-feature insights (genre breakdown + timeline) for a playlist.
+///
+/// Proxies to `GET /insights/{playlist_id}` on the Python sidecar.
+#[tauri::command]
+pub async fn fetch_insights(playlist_id: String) -> Result<Value, String> {
+    let client = Client::new();
+    let url = format!(
+        "{}/insights/{}",
+        sidecar_base(),
+        urlencoding::encode(&playlist_id),
+    );
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach sidecar: {e}"))?;
+    check_response(resp).await
+}
+
 /// Fetch Spotify recommendations seeded by a single track.
 ///
 /// Returned tracks are cached in the SQLite `tracks` table.

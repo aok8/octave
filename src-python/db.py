@@ -15,6 +15,15 @@ import time
 from typing import Any, Dict, List, Optional
 
 
+def get_db_path() -> str:
+    """Return the path to the Octave SQLite database.
+
+    Reads OCTAVE_DB_PATH environment variable, falling back to "octave.db"
+    in the current working directory.
+    """
+    return os.environ.get("OCTAVE_DB_PATH", "octave.db")
+
+
 def get_db() -> sqlite3.Connection:
     """Return a SQLite connection to the shared Octave database.
 

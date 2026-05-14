@@ -24,7 +24,7 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 | Sprint 2 | Playlist/track/audio-features pipeline, SQLite cache, UI component library | ✅ Done |
 | Sprint 3 | Home screen, Seed flows, D3 Insights charts (donut + stacked area) | ✅ Done |
 | Sprint 4 | Refinement screen (7 sliders + genre filter/boost), Export to Spotify | ✅ Done |
-| Sprint 5 | Settings, accessibility, packaging (Windows + Linux), polish | 🔜 Next |
+| Sprint 5 | Settings, accessibility, packaging (Windows + Linux), polish | 🔄 In Progress |
 
 **Test coverage**: 78 Python pytest · 68 Vitest (9 test files) — all passing on `master`.
 

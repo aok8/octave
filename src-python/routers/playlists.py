@@ -23,6 +23,7 @@ from db import (
     get_cached_playlists,
     get_cached_tracks,
     get_db,
+    log_interaction,
     update_recently_used,
     upsert_playlist,
     upsert_playlist_track,
@@ -187,6 +188,11 @@ def get_playlists(
                 background_tasks.add_task(
                     _fetch_and_cache_playlists, sp, user_id
                 )
+        conn_log = get_db()
+        try:
+            log_interaction(conn_log, event_type="playlist_viewed", payload={"user_id": user_id})
+        finally:
+            conn_log.close()
         return [_response_playlist(row) for row in cached]
 
     # Cache miss or forced refresh
@@ -198,6 +204,11 @@ def get_playlists(
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to fetch playlists: {exc}")
 
+    conn_log = get_db()
+    try:
+        log_interaction(conn_log, event_type="playlist_viewed", payload={"user_id": user_id})
+    finally:
+        conn_log.close()
     return [_response_playlist(row) for row in rows]
 
 

@@ -135,6 +135,46 @@ def test_audio_features_cache_dedup(client: TestClient, tmp_db: str, mocker):
         pytest.skip(f"Endpoint not implemented yet (r1={r1.status_code}, r2={r2.status_code})")
 
 
+def test_audio_features_graceful_degradation_on_403(client: TestClient, tmp_db: str, mocker):
+    """When Spotify returns 403 (endpoint removed), synthesised features are returned instead of an error."""
+    track_ids = ["degrade1", "degrade2"]
+    _seed_tracks(tmp_db, track_ids)
+
+    exc = spotipy.SpotifyException(http_status=403, code=-1, msg="Forbidden")
+    mocker.patch.object(spotipy.Spotify, "audio_features", side_effect=exc)
+
+    response = client.get(
+        "/tracks/audio-features",
+        params={"track_ids": ",".join(track_ids), "access_token": FAKE_TOKEN},
+    )
+
+    assert response.status_code == 200, f"Expected 200 with synthetic fallback, got {response.status_code}"
+    data = response.json()
+    assert len(data) == 2, f"Expected 2 synthetic feature objects, got {len(data)}"
+    for feat in data:
+        for field in AUDIO_FEATURE_FIELDS:
+            assert field in feat, f"Missing field '{field}' in synthetic feature object"
+
+
+def test_audio_features_graceful_degradation_on_400(client: TestClient, tmp_db: str, mocker):
+    """When Spotify returns 400 (endpoint removed), synthesised features are returned instead of an error."""
+    track_ids = ["degrade400_1"]
+    _seed_tracks(tmp_db, track_ids)
+
+    exc = spotipy.SpotifyException(http_status=400, code=-1, msg="Bad Request")
+    mocker.patch.object(spotipy.Spotify, "audio_features", side_effect=exc)
+
+    response = client.get(
+        "/tracks/audio-features",
+        params={"track_ids": ",".join(track_ids), "access_token": FAKE_TOKEN},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["energy"] == 0.5  # synthetic mid-range value
+
+
 def test_audio_features_partial_cache(client: TestClient, tmp_db: str, mocker):
     """Pre-seed 3 tracks in DB; request 5 (3 cached + 2 new); assert Spotify called with only 2 IDs."""
     cached_ids = [f"cached_track{i}" for i in range(3)]

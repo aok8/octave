@@ -117,15 +117,27 @@ def test_search_not_cached(client: TestClient, tmp_db: str):
         pytest.skip(f"Endpoint not implemented yet (status {response.status_code})")
 
 
+def _make_seed_track(track_id: str, artist_name: str = "Rec Artist") -> dict:
+    return {
+        "id": track_id,
+        "name": "Seed Track",
+        "artists": [{"id": "art1", "name": artist_name}],
+        "album": {"name": "Seed Album", "images": []},
+        "duration_ms": 180000,
+        "popularity": 70,
+    }
+
+
 def test_recommendations_returns_tracks(client: TestClient, mocker):
-    """GET /recommendations?seed_track_id=X returns list of tracks."""
+    """GET /recommendations?seed_track_id=X returns tracks by the seed track's artist."""
     seed_id = "seed_track1"
     rec_tracks = [_make_recommendation_track(f"rec{i}") for i in range(5)]
 
+    mocker.patch.object(spotipy.Spotify, "track", return_value=_make_seed_track(seed_id))
     mocker.patch.object(
         spotipy.Spotify,
-        "recommendations",
-        return_value={"tracks": rec_tracks, "seeds": []},
+        "search",
+        return_value={"tracks": {"items": rec_tracks, "total": 5, "next": None}},
     )
 
     response = client.get(
@@ -141,27 +153,27 @@ def test_recommendations_returns_tracks(client: TestClient, mocker):
         pytest.skip(f"Endpoint not implemented yet (status {response.status_code})")
 
 
-def test_recommendations_with_targets(client: TestClient, mocker):
-    """Pass target_energy=0.8; assert recommendations call included that parameter."""
-    seed_id = "seed_track_energy"
-    rec_tracks = [_make_recommendation_track(f"erec{i}") for i in range(3)]
+def test_recommendations_uses_artist_search(client: TestClient, mocker):
+    """The artist name from the seed track must appear in the search query."""
+    seed_id = "seed_artist_search"
+    rec_tracks = [_make_recommendation_track("art_rec1")]
 
-    mock_recs = mocker.patch.object(
+    mocker.patch.object(spotipy.Spotify, "track", return_value=_make_seed_track(seed_id, "Test Artist"))
+    mock_search = mocker.patch.object(
         spotipy.Spotify,
-        "recommendations",
-        return_value={"tracks": rec_tracks, "seeds": []},
+        "search",
+        return_value={"tracks": {"items": rec_tracks, "total": 1, "next": None}},
     )
 
     response = client.get(
         "/search/recommendations",
-        params={"seed_track_id": seed_id, "target_energy": 0.8, "access_token": FAKE_TOKEN},
+        params={"seed_track_id": seed_id, "access_token": FAKE_TOKEN},
     )
 
     if response.status_code == 200:
-        assert mock_recs.called, "Expected Spotify recommendations to be called"
-        _, kwargs = mock_recs.call_args
-        assert kwargs.get("target_energy") == pytest.approx(0.8), (
-            f"Expected target_energy=0.8 in Spotify call, got kwargs: {kwargs}"
-        )
+        assert mock_search.called, "Expected sp.search() to be called"
+        call_kwargs = mock_search.call_args[1]
+        query = call_kwargs.get("q", "")
+        assert "Test Artist" in query, f"Expected artist name in search query, got: {query}"
     else:
         pytest.skip(f"Endpoint not implemented yet (status {response.status_code})")

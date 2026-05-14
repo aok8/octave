@@ -91,6 +91,7 @@ pub fn start_oauth(
 }
 
 /// Exchanges the authorization code for access + refresh tokens, storing them in the OS keychain.
+#[allow(dead_code)]
 pub async fn handle_callback(
     code: &str,
     client_id: &str,
@@ -149,6 +150,7 @@ pub async fn handle_callback(
 }
 
 /// Refreshes the access token using the stored refresh token.
+#[allow(dead_code)]
 pub async fn refresh_token(client_id: &str) -> Result<String, String> {
     let stored_refresh = retrieve_token(REFRESH_TOKEN_KEY)?;
 

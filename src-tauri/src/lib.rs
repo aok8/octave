@@ -25,30 +25,34 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // defined in commands/mod.rs
             commands::ping,
             commands::get_auth_state,
             commands::start_oauth,
-            commands::logout,
-            commands::fetch_playlists,
-            commands::fetch_playlist_tracks,
-            commands::fetch_audio_features,
-            commands::search_tracks,
-            commands::fetch_recommendations,
-            commands::fetch_insights,
-            commands::refine_playlist,
-            commands::export_playlist,
-            commands::sidecar_logout,
-            commands::get_user_profile,
-            commands::export_db,
-            commands::import_db,
-            commands::get_recently_used,
-            commands::start_discovery_session,
-            commands::send_discovery_feedback,
-            commands::end_discovery_session,
-            commands::start_discovery_export,
-            commands::generate_ai_playlist,
-            commands::set_ai_key,
-            commands::get_ai_status,
+            // defined in commands/api.rs
+            commands::api::logout,
+            commands::api::fetch_playlists,
+            commands::api::fetch_playlist_tracks,
+            commands::api::fetch_audio_features,
+            commands::api::search_tracks,
+            commands::api::fetch_recommendations,
+            commands::api::fetch_insights,
+            commands::api::refine_playlist,
+            commands::api::export_playlist,
+            commands::api::sidecar_logout,
+            commands::api::get_user_profile,
+            commands::api::export_db,
+            commands::api::import_db,
+            commands::api::get_recently_used,
+            // defined in commands/discovery.rs
+            commands::discovery::start_discovery_session,
+            commands::discovery::send_discovery_feedback,
+            commands::discovery::end_discovery_session,
+            commands::discovery::start_discovery_export,
+            // defined in commands/ai_cmd.rs
+            commands::ai_cmd::generate_ai_playlist,
+            commands::ai_cmd::set_ai_key,
+            commands::ai_cmd::get_ai_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

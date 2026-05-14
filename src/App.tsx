@@ -8,6 +8,7 @@ import { LoadingState } from "./components/LoadingState";
 import { ErrorState } from "./components/ErrorState";
 import { Settings } from "./screens/Settings";
 import { AIPrompt } from "./screens/AIPrompt";
+import { DiscoveryMode } from "./screens/DiscoveryMode";
 import {
   mockTracks,
   mockPlaylists,
@@ -124,13 +125,14 @@ function StatesPage() {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 
-type PageId = "home" | "library" | "create" | "ai-prompt" | "settings";
+type PageId = "home" | "library" | "create" | "ai-prompt" | "discover" | "settings";
 
 const PAGE_MAP: Record<PageId, React.ReactNode> = {
   home: <TracksPage />,
   library: <PlaylistsPage />,
   create: <SlidersPage />,
   "ai-prompt": <AIPrompt />,
+  discover: <DiscoveryMode />,
   settings: <Settings />,
 };
 

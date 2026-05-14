@@ -324,6 +324,70 @@ def log_interaction(
     conn.commit()
 
 
+# ---------------------------------------------------------------------------
+# Discovery session helpers
+# ---------------------------------------------------------------------------
+
+
+def create_discovery_session(
+    conn: sqlite3.Connection,
+    session_id: str,
+    user_id: str,
+    seed_track_id: str,
+    centroid_json: str,
+) -> None:
+    """Insert a new discovery_sessions row."""
+    conn.execute(
+        """
+        INSERT INTO discovery_sessions
+            (id, user_id, seed_track_id, centroid, status, created_at, updated_at)
+        VALUES (?, ?, ?, ?, 'active', strftime('%s','now'), strftime('%s','now'))
+        """,
+        (session_id, user_id, seed_track_id, centroid_json),
+    )
+    conn.commit()
+
+
+def update_discovery_centroid(
+    conn: sqlite3.Connection,
+    session_id: str,
+    centroid_json: str,
+) -> None:
+    """Update the centroid JSON for a discovery session."""
+    conn.execute(
+        """
+        UPDATE discovery_sessions
+        SET centroid = ?, updated_at = strftime('%s','now')
+        WHERE id = ?
+        """,
+        (centroid_json, session_id),
+    )
+    conn.commit()
+
+
+def end_discovery_session(conn: sqlite3.Connection, session_id: str) -> None:
+    """Mark a discovery session as ended."""
+    conn.execute(
+        """
+        UPDATE discovery_sessions
+        SET status = 'ended', updated_at = strftime('%s','now')
+        WHERE id = ?
+        """,
+        (session_id,),
+    )
+    conn.commit()
+
+
+def get_discovery_session(conn: sqlite3.Connection, session_id: str) -> Optional[Dict[str, Any]]:
+    """Return a discovery_sessions row as a dict, or None if not found."""
+    cursor = conn.execute(
+        "SELECT * FROM discovery_sessions WHERE id = ?",
+        (session_id,),
+    )
+    row = cursor.fetchone()
+    return dict(row) if row else None
+
+
 def get_recently_used(conn: sqlite3.Connection, limit: int = 10) -> list:
     """Return recently used playlists ordered by access time descending."""
     cursor = conn.execute(

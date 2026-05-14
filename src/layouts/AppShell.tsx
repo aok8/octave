@@ -4,7 +4,7 @@ import { PageTransition } from "./PageTransition";
 
 // ── Nav item definition ──────────────────────────────────────────────────────
 
-type NavId = "home" | "library" | "create" | "ai-prompt" | "settings";
+type NavId = "home" | "library" | "create" | "ai-prompt" | "discover" | "settings";
 
 interface NavItem {
   id: NavId;
@@ -42,6 +42,13 @@ function AIPromptIcon() {
     </svg>
   );
 }
+function DiscoverIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13l-1 5.5 5.5-1-1-5.5L10 7zm1 6c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z" />
+    </svg>
+  );
+}
 function SettingsIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -55,6 +62,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "library", label: "Library", icon: <LibraryIcon /> },
   { id: "create", label: "Create", icon: <CreateIcon /> },
   { id: "ai-prompt", label: "AI Prompt", icon: <AIPromptIcon /> },
+  { id: "discover", label: "Discover", icon: <DiscoverIcon /> },
   { id: "settings", label: "Settings", icon: <SettingsIcon /> },
 ];
 

@@ -104,6 +104,28 @@ describe("Settings screen", () => {
     expect(section).toHaveTextContent("MIT");
   });
 
+  // ── AI provider status section ────────────────────────────────────────────
+
+  it("renders AI provider status section", () => {
+    render(<Settings />);
+    const section = screen.getByTestId("settings-ai-status");
+    expect(section).toBeInTheDocument();
+    expect(section).toHaveAttribute("role", "region");
+    expect(section).toHaveAttribute("aria-label", "AI provider status");
+  });
+
+  it("renders OpenRouter and Ollama status chips as Offline", () => {
+    render(<Settings />);
+    const openRouterChip = screen.getByTestId("settings-ai-openrouter-chip");
+    const ollamaChip = screen.getByTestId("settings-ai-ollama-chip");
+    expect(openRouterChip).toBeInTheDocument();
+    expect(openRouterChip).toHaveTextContent("OpenRouter");
+    expect(openRouterChip).toHaveTextContent("Offline");
+    expect(ollamaChip).toBeInTheDocument();
+    expect(ollamaChip).toHaveTextContent("Local (Ollama)");
+    expect(ollamaChip).toHaveTextContent("Offline");
+  });
+
   // ── Accessibility ─────────────────────────────────────────────────────────
 
   it("account section has region role", () => {

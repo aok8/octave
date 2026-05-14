@@ -1,9 +1,14 @@
 pub mod api;
+pub mod discovery;
 
 pub use api::{
     export_db, export_playlist, fetch_audio_features, fetch_insights, fetch_playlist_tracks,
     fetch_playlists, fetch_recommendations, get_recently_used, get_user_profile, import_db,
     logout, refine_playlist, search_tracks, sidecar_logout,
+};
+pub use discovery::{
+    end_discovery_session, send_discovery_feedback, start_discovery_export,
+    start_discovery_session,
 };
 
 use crate::auth::{self, AuthStateInfo, OAuthState};

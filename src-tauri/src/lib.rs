@@ -46,6 +46,9 @@ pub fn run() {
             commands::send_discovery_feedback,
             commands::end_discovery_session,
             commands::start_discovery_export,
+            commands::generate_ai_playlist,
+            commands::set_ai_key,
+            commands::get_ai_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

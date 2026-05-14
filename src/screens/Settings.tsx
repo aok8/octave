@@ -288,8 +288,11 @@ export function Settings() {
           </span>
         </div>
 
-        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.30)", margin: 0 }}>
-          AI features coming in V2.
+        <p
+          data-testid="settings-ai-configure-link"
+          style={{ fontSize: 12, color: "rgba(255,255,255,0.30)", margin: 0 }}
+        >
+          Configure your API key in the AI Prompt screen.
         </p>
       </div>
 

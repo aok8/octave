@@ -9,6 +9,7 @@ from routers.playlists import root_router as playlists_root_router
 from routers.storage import router as storage_router
 from routers.auth import router as auth_router
 from routers.discovery import router as discovery_router
+from routers.ai_router import router as ai_router
 import uvicorn
 
 app = FastAPI(title="Octave API", version="2.0.0")
@@ -29,6 +30,7 @@ app.include_router(export.router, prefix="/export", tags=["export"])
 app.include_router(storage_router, prefix="/storage", tags=["storage"])
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
 app.include_router(discovery_router, prefix="/discovery", tags=["discovery"])
+app.include_router(ai_router, prefix="/ai", tags=["ai"])
 app.include_router(playlists_root_router, tags=["playlists"])
 
 

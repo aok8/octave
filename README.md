@@ -27,9 +27,10 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 | Sprint 5 | Settings, AI Prompt placeholder, storage/auth endpoints | ✅ Done |
 | Sprint 6 | Accessibility pass, Home IPC wiring, Inter font, packaging config, logout | ✅ Done |
 | Sprint 7 | (previous sprint work) | ✅ Done |
-| Sprint 8 | Discovery Mode (swipe cards, keyboard nav, queue drawer, export), Settings AI status | 🔄 In Progress |
+| Sprint 8 | Discovery Mode (swipe cards, keyboard nav, queue drawer, export), Settings AI status | ✅ Done |
+| Sprint 9 | AI Playlist Generation (OpenRouter + Ollama), Discovery seed wiring (R-11) | 🔄 In Progress |
 
-**Test coverage**: 88 Python pytest · 100+ Vitest (13+ test files) — all passing on `sprint/8-discovery-mode`.
+**Test coverage**: 103 Python pytest · 115+ Vitest (14+ test files) — all passing on `sprint/9-ai-generation`.
 
 ## Features
 
@@ -40,7 +41,7 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 - **Export** — save refined playlist to Spotify as a new playlist or overwrite an existing one
 - **Settings** — Spotify account info, logout (keychain clear), database export/import, app version
 - **Discovery Mode** — swipe-card discovery session: keep (→) or skip (←) tracks one at a time, keyboard shortcuts, queue drawer, export kept tracks to Spotify
-- **AI Prompt** — placeholder screen for V2 AI playlist generation (Coming Soon)
+- **AI Playlist Generation** — natural language prompt → Spotify track search → export; OpenRouter API or local Ollama
 - **Accessibility** — `aria-label`, `role="region"` / `role="main"` across all screens, labelled nav
 
 ## Getting Started

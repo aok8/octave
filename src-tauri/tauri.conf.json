@@ -48,7 +48,7 @@
         "installerIcon": "icons/icon.ico",
         "headerImage": "icons/128x128.png",
         "sidebarImage": "icons/128x128@2x.png",
-        "license": "../../LICENSE",
+        "license": "../LICENSE",
         "minimumWebview2Version": "2.0.0"
       }
     },

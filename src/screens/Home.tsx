@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "framer-motion";
 import { PlaylistCard } from "../components/PlaylistCard";
+import { LoadingState } from "../components/LoadingState";
+import { ErrorState } from "../components/ErrorState";
 import type { Playlist } from "../types";
 import { mockPlaylists } from "../mocks";
 
@@ -57,8 +60,9 @@ interface HomeProps {
 
 export function Home({ onNavigate }: HomeProps) {
   const [taglineIndex, setTaglineIndex] = useState(0);
-  // TODO: wire IPC — replace with: invoke('recently_used') from tauriCommands
-  const [recentPlaylists] = useState<Playlist[]>(mockPlaylists.slice(0, 4));
+  const [recentPlaylists, setRecentPlaylists] = useState<Playlist[]>([]);
+  const [recentLoading, setRecentLoading] = useState(true);
+  const [recentError, setRecentError] = useState<string | null>(null);
 
   // Rotate taglines every 4 seconds
   useEffect(() => {
@@ -66,6 +70,29 @@ export function Home({ onNavigate }: HomeProps) {
       setTaglineIndex((i) => (i + 1) % TAGLINES.length);
     }, 4000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Fetch recently used playlists from IPC on mount
+  useEffect(() => {
+    let cancelled = false;
+    setRecentLoading(true);
+    setRecentError(null);
+    invoke<Playlist[]>("get_recently_used")
+      .then((data) => {
+        if (!cancelled) setRecentPlaylists(data);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setRecentPlaylists([]);
+          setRecentError("Could not load recently used playlists.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setRecentLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const CREATION_CARDS: CreationCard[] = [
@@ -94,6 +121,7 @@ export function Home({ onNavigate }: HomeProps) {
 
   return (
     <div
+      role="main"
       style={{
         padding: 32,
         background: "#121212",
@@ -181,7 +209,11 @@ export function Home({ onNavigate }: HomeProps) {
           Recently Used
         </h2>
 
-        {recentPlaylists.length === 0 ? (
+        {recentLoading ? (
+          <LoadingState type="list" />
+        ) : recentError ? (
+          <ErrorState message={recentError} />
+        ) : recentPlaylists.length === 0 ? (
           <p
             style={{
               fontSize: 14,
@@ -226,6 +258,7 @@ function CreationCardItem({ card }: { card: CreationCard }) {
       onMouseEnter={() => !card.disabled && setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       aria-disabled={card.disabled}
+      aria-label={card.title}
       style={{
         display: "flex",
         flexDirection: "column",

@@ -87,6 +87,7 @@ export function Export({
 
   return (
     <div
+      role="main"
       style={{
         padding: 32,
         background: "#121212",

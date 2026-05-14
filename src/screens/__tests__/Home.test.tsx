@@ -8,7 +8,9 @@
 import type { ReactNode, HTMLAttributes } from "react";
 import { render, screen, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { invoke } from "@tauri-apps/api/core";
 import Home from "../Home";
+import { mockPlaylists } from "../../mocks";
 
 // Mock Framer Motion to avoid animation complexity in tests
 vi.mock("framer-motion", () => ({
@@ -25,11 +27,14 @@ vi.mock("framer-motion", () => ({
 
 // Mock @tauri-apps/api/core
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn().mockResolvedValue([]),
+  invoke: vi.fn(),
 }));
+
+const mockInvoke = vi.mocked(invoke);
 
 beforeEach(() => {
   vi.useFakeTimers();
+  mockInvoke.mockResolvedValue(mockPlaylists);
 });
 
 afterEach(() => {
@@ -107,6 +112,18 @@ describe("Home screen", () => {
   it("renders recently used section", () => {
     render(<Home />);
     expect(screen.getByText(/recently used/i)).toBeInTheDocument();
+  });
+
+  it("renders recently used grid from IPC data", async () => {
+    render(<Home />);
+    // The IPC call resolves via microtasks — flush with act() without
+    // advancing fake timers (which would spin the tagline setInterval forever)
+    await act(async () => {});
+    expect(mockInvoke).toHaveBeenCalledWith("get_recently_used");
+    // At least the first mock playlist name should appear
+    if (mockPlaylists.length > 0) {
+      expect(screen.getByText(mockPlaylists[0].name)).toBeInTheDocument();
+    }
   });
 
   it("renders the app title", () => {

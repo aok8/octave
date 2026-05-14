@@ -2,8 +2,8 @@ pub mod api;
 
 pub use api::{
     export_db, export_playlist, fetch_audio_features, fetch_insights, fetch_playlist_tracks,
-    fetch_playlists, fetch_recommendations, get_user_profile, import_db, refine_playlist,
-    search_tracks, sidecar_logout,
+    fetch_playlists, fetch_recommendations, get_recently_used, get_user_profile, import_db,
+    logout, refine_playlist, search_tracks, sidecar_logout,
 };
 
 use crate::auth::{self, AuthStateInfo, OAuthState};
@@ -41,8 +41,3 @@ pub async fn start_oauth(
     auth::start_oauth(&client_id, &oauth_state, &TauriOpener(app))
 }
 
-/// Clears keychain tokens, effectively logging the user out.
-#[tauri::command]
-pub fn logout() -> Result<(), String> {
-    auth::clear_tokens()
-}

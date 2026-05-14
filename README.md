@@ -25,10 +25,9 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 | Sprint 3 | Home screen, Seed flows, D3 Insights charts (donut + stacked area) | ✅ Done |
 | Sprint 4 | Refinement screen (7 sliders + genre filter/boost), Export to Spotify | ✅ Done |
 | Sprint 5 | Settings, AI Prompt placeholder, storage/auth endpoints | ✅ Done |
-| Sprint 6 | Accessibility pass, Home IPC wiring, Inter font, packaging config, logout | ✅ Done |
-| Sprint 7 | CI pipeline, artist genre fix (R-08), skeleton polish, page transitions | 🔄 In Progress |
+| Sprint 6 | Accessibility pass, Home IPC wiring, Inter font, packaging config, logout | 🔄 In Progress |
 
-**Test coverage**: 88 Python pytest · 84 Vitest (12 test files) — all passing on `sprint/7-ci-genre-polish`.
+**Test coverage**: 87 Python pytest · 83 Vitest (11 test files) — all passing on `sprint/6-polish-packaging`.
 
 ## Features
 
@@ -40,7 +39,6 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 - **Settings** — Spotify account info, logout (keychain clear), database export/import, app version
 - **AI Prompt** — placeholder screen for V2 AI playlist generation (Coming Soon)
 - **Accessibility** — `aria-label`, `role="region"` / `role="main"` across all screens, labelled nav
-- **Genre classification** — artist genres fetched from Spotify and stored per-track; Insights donut and Refinement ranker use real genre data (not "Other" for all tracks)
 
 ## Getting Started
 

@@ -29,15 +29,17 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 | Sprint 7 | (previous sprint work) | ✅ Done |
 | Sprint 8 | Discovery Mode (swipe cards, keyboard nav, queue drawer, export), Settings AI status | ✅ Done |
 | Sprint 9 | AI Playlist Generation (OpenRouter + Ollama), Discovery seed wiring (R-11) | ✅ Done |
+| Sprint 10 | Fix deprecated Spotify endpoints (audio features fallback, artist-search recommendations) | ✅ Done |
+| Sprint 11 | Tauri build artifact in CI, installer packaging | 🔜 Next |
 
-**Test coverage**: 123 Python pytest · 110 Vitest (14 test files) — all passing on `master`.
+**Test coverage**: 125 Python pytest · 110 Vitest (14 test files) — all passing on `sprint/10-fix-deprecated-endpoints`.
 
 ## Features
 
 - **Seed Playlist** — browse your Spotify library, select a playlist, view full tracklist
 - **Seed Song** — search Spotify catalog, pick a track, get AI-powered recommendations
 - **Insights** — interactive D3 donut chart (genre breakdown) + stacked area chart (mood/energy flow)
-- **Refinement** — 7 audio-feature sliders (energy, tempo, valence, danceability, acousticness, instrumentalness, popularity), genre filter/boost via donut clicks, live track preview with position deltas
+- **Refinement** — 7 audio-feature sliders (energy, tempo, valence, danceability, acousticness, instrumentalness, popularity), genre filter/boost via donut clicks, live track preview with position deltas; graceful fallback to mid-range values when Spotify's deprecated audio-features endpoint is unavailable
 - **Export** — save refined playlist to Spotify as a new playlist or overwrite an existing one
 - **Settings** — Spotify account info, logout (keychain clear), database export/import, app version
 - **Discovery Mode** — swipe-card discovery session: keep (→) or skip (←) tracks one at a time, keyboard shortcuts, queue drawer, export kept tracks to Spotify
@@ -76,7 +78,7 @@ python main.py        # starts FastAPI on port 8000
 ### Tests
 
 ```bash
-# Python sidecar tests (123 tests)
+# Python sidecar tests (125 tests)
 cd src-python
 python -m pytest tests/ -v
 

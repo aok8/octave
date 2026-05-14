@@ -22,6 +22,29 @@ router = APIRouter()
 _BATCH_SIZE = 100
 
 
+def _synthetic_features(track_id: str) -> dict:
+    """Return mid-range feature values when Spotify's audio-features endpoint is unavailable.
+
+    Spotify removed /audio-features for most apps. This fallback keeps the
+    Refinement sliders functional with neutral values rather than crashing.
+    """
+    return {
+        "id": track_id,
+        "energy": 0.5,
+        "tempo": 120.0,
+        "valence": 0.5,
+        "danceability": 0.5,
+        "acousticness": 0.3,
+        "instrumentalness": 0.1,
+        "speechiness": 0.05,
+        "loudness": -8.0,
+        "key": 0,
+        "mode": 1,
+        "time_signature": 4,
+        "duration_ms": None,
+    }
+
+
 def _spotify_features_to_dict(raw: dict) -> dict:
     """Map a Spotify audio features object to our DB/response shape."""
     return {
@@ -94,6 +117,7 @@ def get_audio_features(
             fresh_features = []
             for i in range(0, len(uncached_ids), _BATCH_SIZE):
                 batch = uncached_ids[i : i + _BATCH_SIZE]
+                results = None
                 try:
                     results = sp.audio_features(batch)
                 except spotipy.SpotifyException as exc:
@@ -103,7 +127,11 @@ def get_audio_features(
                             status_code=401,
                             detail="Invalid or expired Spotify token",
                         )
-                    raise HTTPException(status_code=status, detail=str(exc))
+                    if status in (400, 403):
+                        # Spotify removed this endpoint for most apps — return synthetic values
+                        results = [_synthetic_features(tid) for tid in batch]
+                    else:
+                        raise HTTPException(status_code=status, detail=str(exc))
                 except Exception as exc:
                     raise HTTPException(
                         status_code=500,

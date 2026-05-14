@@ -250,7 +250,7 @@ def get_playlist_tracks(
 
     try:
         tracks_out = []
-        response = sp.playlist_tracks(playlist_id, limit=100)
+        response = sp.playlist_items(playlist_id, limit=100)
         position = 0
         while response:
             for item in response.get("items") or []:

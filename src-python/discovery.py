@@ -51,29 +51,32 @@ def centroid_from_features(audio_features: dict) -> dict:
 
 
 def get_discovery_tracks(sp, seed_track_id: str, centroid: dict, limit: int = 5) -> list:
-    """Fetch recommended tracks from Spotify using the centroid as audio feature targets.
+    """Fetch tracks by the seed track's primary artist for discovery.
 
-    NOTE: sp.recommendations() is a DEPRECATED Spotify endpoint and may return 400
-    in production. Always mock with mocker.patch.object(spotipy.Spotify,
-    'recommendations', ...) in tests — never use @responses.activate for this endpoint.
+    Replaces the deprecated sp.recommendations() with a search-based approach:
+    looks up the seed track's artist, then searches for other tracks by that
+    artist. centroid is accepted for API compatibility but not used in the query.
 
     Returns a list of track dicts with keys: id, name, artists, album, duration_ms.
-    Returns an empty list on any error (best-effort — never blocks the session).
+    Returns an empty list on any error — never blocks the discovery session.
     """
     try:
-        result = sp.recommendations(
-            seed_tracks=[seed_track_id],
-            limit=limit,
-            target_energy=centroid.get("energy", DEFAULT_CENTROID["energy"]),
-            target_valence=centroid.get("valence", DEFAULT_CENTROID["valence"]),
-            target_danceability=centroid.get("danceability", DEFAULT_CENTROID["danceability"]),
-            target_acousticness=centroid.get("acousticness", DEFAULT_CENTROID["acousticness"]),
-        )
+        seed = sp.track(seed_track_id)
+        artists = seed.get("artists") or []
+        if not artists:
+            return []
+        artist_name = artists[0].get("name", "")
+        if not artist_name:
+            return []
+
+        result = sp.search(q=f'artist:"{artist_name}"', type="track", limit=limit + 1)
         tracks = []
-        for item in (result or {}).get("tracks") or []:
+        for item in (result.get("tracks") or {}).get("items") or []:
             if item is None or not item.get("id"):
                 continue
-            artists = [a.get("name", "") for a in (item.get("artists") or [])]
+            if item["id"] == seed_track_id:
+                continue  # skip seed track itself
+            artist_names = [a.get("name", "") for a in (item.get("artists") or [])]
             album = (item.get("album") or {}).get("name")
             images = (item.get("album") or {}).get("images") or []
             album_art_url = images[0]["url"] if images else None
@@ -81,12 +84,12 @@ def get_discovery_tracks(sp, seed_track_id: str, centroid: dict, limit: int = 5)
                 {
                     "id": item["id"],
                     "name": item.get("name", ""),
-                    "artists": artists,
+                    "artists": artist_names,
                     "album": album,
                     "album_art_url": album_art_url,
                     "duration_ms": item.get("duration_ms"),
                 }
             )
-        return tracks
+        return tracks[:limit]
     except Exception:
         return []

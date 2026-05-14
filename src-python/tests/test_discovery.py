@@ -1,14 +1,15 @@
 """
-Tests for the Discovery Mode API (Sprint 8).
+Tests for the Discovery Mode API (Sprint 8 / Sprint 10).
 
 Covers:
 - Unit tests for the centroid algorithm (update_centroid)
 - Integration tests for POST /discovery/start, /feedback, /end
 - Mocking rules:
-  * sp.recommendations()  → mocker.patch.object(spotipy.Spotify, 'recommendations', ...)
+  * sp.track()            → mocker.patch.object(spotipy.Spotify, 'track', ...)
+  * sp.search()           → mocker.patch.object(spotipy.Spotify, 'search', ...)
   * sp.audio_features()   → mocker.patch.object(spotipy.Spotify, 'audio_features', ...)
-  * sp.current_user()     → responses.add(GET, "https://api.spotify.com/v1/me/", ...)
-  NEVER use @responses.activate for recommendations or audio_features.
+  * sp.current_user()     → mocker.patch.object(spotipy.Spotify, 'current_user', ...)
+  NEVER use @responses.activate for track/search/audio_features/recommendations.
 """
 
 import json
@@ -64,31 +65,44 @@ KEPT_FEATURES_STUB = {
     "time_signature": 4,
 }
 
-RECOMMENDATIONS_STUB = {
-    "tracks": [
-        {
-            "id": "rec_track_001",
-            "name": "Recommended Song 1",
-            "artists": [{"id": "art1", "name": "Artist One"}],
-            "album": {
-                "name": "Rec Album",
-                "images": [{"url": "https://example.com/img.jpg"}],
+SEED_TRACK_STUB = {
+    "id": SEED_TRACK_ID,
+    "name": "Seed Song",
+    "artists": [{"id": "art1", "name": "Artist One"}],
+    "album": {"name": "Seed Album", "images": []},
+    "duration_ms": 200000,
+    "popularity": 70,
+}
+
+SEARCH_RESULTS_STUB = {
+    "tracks": {
+        "items": [
+            {
+                "id": "rec_track_001",
+                "name": "Recommended Song 1",
+                "artists": [{"id": "art1", "name": "Artist One"}],
+                "album": {
+                    "name": "Rec Album",
+                    "images": [{"url": "https://example.com/img.jpg"}],
+                },
+                "duration_ms": 210000,
+                "popularity": 70,
             },
-            "duration_ms": 210000,
-            "popularity": 70,
-        },
-        {
-            "id": "rec_track_002",
-            "name": "Recommended Song 2",
-            "artists": [{"id": "art2", "name": "Artist Two"}],
-            "album": {
-                "name": "Rec Album 2",
-                "images": [],
+            {
+                "id": "rec_track_002",
+                "name": "Recommended Song 2",
+                "artists": [{"id": "art1", "name": "Artist One"}],
+                "album": {
+                    "name": "Rec Album 2",
+                    "images": [],
+                },
+                "duration_ms": 195000,
+                "popularity": 65,
             },
-            "duration_ms": 195000,
-            "popularity": 65,
-        },
-    ]
+        ],
+        "total": 2,
+        "next": None,
+    }
 }
 
 
@@ -124,15 +138,14 @@ def _mock_audio_features(mocker, stub=None):
     )
 
 
-def _mock_recommendations(mocker, stub=None):
-    """Patch sp.recommendations() — MUST use mocker.patch.object, never @responses.activate."""
-    if stub is None:
-        stub = RECOMMENDATIONS_STUB
-    mocker.patch.object(
-        spotipy.Spotify,
-        "recommendations",
-        return_value=stub,
-    )
+def _mock_search_discovery(mocker, seed_stub=None, search_stub=None):
+    """Patch sp.track() and sp.search() for the artist-search discovery flow."""
+    if seed_stub is None:
+        seed_stub = SEED_TRACK_STUB
+    if search_stub is None:
+        search_stub = SEARCH_RESULTS_STUB
+    mocker.patch.object(spotipy.Spotify, "track", return_value=seed_stub)
+    mocker.patch.object(spotipy.Spotify, "search", return_value=search_stub)
 
 
 # ---------------------------------------------------------------------------
@@ -185,7 +198,7 @@ def test_discovery_start_returns_session_id(client: TestClient, tmp_db: str, moc
     _seed_user(tmp_db)
     _mock_me(mocker)
     _mock_audio_features(mocker)
-    _mock_recommendations(mocker)
+    _mock_search_discovery(mocker)
 
     resp = client.post(
         "/discovery/start",
@@ -202,7 +215,7 @@ def test_discovery_start_creates_db_row(client: TestClient, tmp_db: str, mocker)
     _seed_user(tmp_db)
     _mock_me(mocker)
     _mock_audio_features(mocker)
-    _mock_recommendations(mocker)
+    _mock_search_discovery(mocker)
 
     resp = client.post(
         "/discovery/start",
@@ -229,20 +242,19 @@ def test_discovery_start_creates_db_row(client: TestClient, tmp_db: str, mocker)
     assert dict(row2)["seed_track_id"] == SEED_TRACK_ID
 
 
-def test_discovery_start_calls_recommendations(client: TestClient, tmp_db: str, mocker):
-    """POST /discovery/start must call sp.recommendations() (mocked)."""
+def test_discovery_start_calls_search(client: TestClient, tmp_db: str, mocker):
+    """POST /discovery/start must call sp.search() to find tracks by the seed artist."""
     _seed_user(tmp_db)
     _mock_me(mocker)
     _mock_audio_features(mocker)
-    rec_mock = _mock_recommendations(mocker)
+    _mock_search_discovery(mocker)
 
     resp = client.post(
         "/discovery/start",
         json={"access_token": FAKE_TOKEN, "seed_track_id": SEED_TRACK_ID},
     )
     assert resp.status_code == 200, resp.text
-    # Verify recommendations were requested (mock was called)
-    assert spotipy.Spotify.recommendations.called  # type: ignore[attr-defined]
+    assert spotipy.Spotify.search.called  # type: ignore[attr-defined]
 
 
 def test_discovery_start_logs_event(client: TestClient, tmp_db: str, mocker):
@@ -250,7 +262,7 @@ def test_discovery_start_logs_event(client: TestClient, tmp_db: str, mocker):
     _seed_user(tmp_db)
     _mock_me(mocker)
     _mock_audio_features(mocker)
-    _mock_recommendations(mocker)
+    _mock_search_discovery(mocker)
 
     resp = client.post(
         "/discovery/start",
@@ -286,7 +298,7 @@ def _start_session(client: TestClient, tmp_db: str, mocker) -> str:
     _seed_user(tmp_db)
     _mock_me(mocker)
     _mock_audio_features(mocker)
-    _mock_recommendations(mocker)
+    _mock_search_discovery(mocker)
     resp = client.post(
         "/discovery/start",
         json={"access_token": FAKE_TOKEN, "seed_track_id": SEED_TRACK_ID},
@@ -314,7 +326,7 @@ def test_discovery_feedback_keep_updates_centroid(client: TestClient, tmp_db: st
         "audio_features",
         return_value=[KEPT_FEATURES_STUB],
     )
-    _mock_recommendations(mocker)
+    _mock_search_discovery(mocker)
 
     resp = client.post(
         "/discovery/feedback",
@@ -356,7 +368,7 @@ def test_discovery_feedback_skip_does_not_update_centroid(client: TestClient, tm
 
     _mock_me(mocker)
     _mock_audio_features(mocker)
-    _mock_recommendations(mocker)
+    _mock_search_discovery(mocker)
 
     resp = client.post(
         "/discovery/feedback",
@@ -387,7 +399,7 @@ def test_discovery_feedback_returns_next_track(client: TestClient, tmp_db: str, 
 
     _mock_me(mocker)
     _mock_audio_features(mocker)
-    _mock_recommendations(mocker)
+    _mock_search_discovery(mocker)
 
     resp = client.post(
         "/discovery/feedback",
@@ -412,7 +424,7 @@ def test_discovery_feedback_logs_event(client: TestClient, tmp_db: str, mocker):
 
     _mock_me(mocker)
     _mock_audio_features(mocker)
-    _mock_recommendations(mocker)
+    _mock_search_discovery(mocker)
 
     resp = client.post(
         "/discovery/feedback",

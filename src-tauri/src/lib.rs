@@ -36,6 +36,10 @@ pub fn run() {
             commands::fetch_insights,
             commands::refine_playlist,
             commands::export_playlist,
+            commands::sidecar_logout,
+            commands::get_user_profile,
+            commands::export_db,
+            commands::import_db,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

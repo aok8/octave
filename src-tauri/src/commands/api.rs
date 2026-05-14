@@ -194,6 +194,73 @@ pub async fn refine_playlist(payload: Value) -> Result<Value, String> {
     check_response(resp).await
 }
 
+/// Call `POST /auth/logout` on the Python sidecar.
+///
+/// Token clearing from the OS keychain is handled on the Rust side (see
+/// `commands::logout`).  This command notifies the sidecar so it can perform
+/// any server-side session teardown in the future.
+#[tauri::command]
+pub async fn sidecar_logout() -> Result<serde_json::Value, String> {
+    let url = format!("{}/auth/logout", sidecar_base());
+    let client = Client::new();
+    let res = client
+        .post(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach sidecar: {e}"))?;
+    check_response(res).await
+}
+
+/// Fetch the authenticated user's profile from the Python sidecar.
+///
+/// Proxies to `GET /auth/profile`.
+#[tauri::command]
+pub async fn get_user_profile() -> Result<serde_json::Value, String> {
+    let url = format!("{}/auth/profile", sidecar_base());
+    let client = Client::new();
+    let res = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach sidecar: {e}"))?;
+    check_response(res).await
+}
+
+/// Export the Octave SQLite database to a user-specified file path.
+///
+/// Proxies to `POST /storage/export`.
+#[tauri::command]
+pub async fn export_db(path: String) -> Result<serde_json::Value, String> {
+    let url = format!("{}/storage/export", sidecar_base());
+    let client = Client::new();
+    let body = serde_json::json!({ "path": path });
+    let res = client
+        .post(&url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    check_response(res).await
+}
+
+/// Import a SQLite database file into Octave.
+///
+/// Proxies to `POST /storage/import`.
+/// `mode` must be `"merge"` or `"replace"`.
+#[tauri::command]
+pub async fn import_db(path: String, mode: String) -> Result<serde_json::Value, String> {
+    let url = format!("{}/storage/import", sidecar_base());
+    let client = Client::new();
+    let body = serde_json::json!({ "path": path, "mode": mode });
+    let res = client
+        .post(&url)
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    check_response(res).await
+}
+
 /// Export a Spotify playlist (create new or overwrite existing).
 ///
 /// Routes based on `payload["mode"]`:

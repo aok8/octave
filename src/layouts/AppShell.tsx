@@ -54,7 +54,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "home", label: "Home", icon: <HomeIcon /> },
   { id: "library", label: "Library", icon: <LibraryIcon /> },
   { id: "create", label: "Create", icon: <CreateIcon /> },
-  { id: "ai-prompt", label: "AI Prompt", icon: <AIPromptIcon />, disabled: true },
+  { id: "ai-prompt", label: "AI Prompt", icon: <AIPromptIcon /> },
   { id: "settings", label: "Settings", icon: <SettingsIcon /> },
 ];
 

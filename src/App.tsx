@@ -6,6 +6,8 @@ import { GenreChip } from "./components/GenreChip";
 import { AudioFeatureSlider } from "./components/AudioFeatureSlider";
 import { LoadingState } from "./components/LoadingState";
 import { ErrorState } from "./components/ErrorState";
+import { Settings } from "./screens/Settings";
+import { AIPrompt } from "./screens/AIPrompt";
 import {
   mockTracks,
   mockPlaylists,
@@ -128,36 +130,8 @@ const PAGE_MAP: Record<PageId, React.ReactNode> = {
   home: <TracksPage />,
   library: <PlaylistsPage />,
   create: <SlidersPage />,
-  "ai-prompt": (
-    <div style={{ padding: 24 }}>
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 12,
-          minHeight: 300,
-          color: "rgba(255,255,255,0.35)",
-        }}
-      >
-        <span style={{ fontSize: 32 }}>🔒</span>
-        <p style={{ fontSize: 16, margin: 0 }}>Beyond the same old recommendations.</p>
-        <span
-          style={{
-            fontSize: 11,
-            border: "1px solid rgba(255,255,255,0.2)",
-            borderRadius: 6,
-            padding: "2px 8px",
-            color: "rgba(255,255,255,0.4)",
-          }}
-        >
-          Coming soon
-        </span>
-      </div>
-    </div>
-  ),
-  settings: <StatesPage />,
+  "ai-prompt": <AIPrompt />,
+  settings: <Settings />,
 };
 
 function App() {

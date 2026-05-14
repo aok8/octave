@@ -34,6 +34,8 @@ pub fn run() {
             commands::search_tracks,
             commands::fetch_recommendations,
             commands::fetch_insights,
+            commands::refine_playlist,
+            commands::export_playlist,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

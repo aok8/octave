@@ -175,3 +175,48 @@ pub async fn fetch_recommendations(
         .map_err(|e| format!("Failed to reach sidecar: {e}"))?;
     check_response(resp).await
 }
+
+/// Filter and re-rank a playlist's track pool.
+///
+/// Proxies to `POST /refine` on the Python sidecar.
+/// The payload must conform to the `RefineRequest` schema:
+///   { playlist_id, track_ids, constraints, genre_config }
+#[tauri::command]
+pub async fn refine_playlist(payload: Value) -> Result<Value, String> {
+    let url = format!("{}/refine", sidecar_base());
+    let client = Client::new();
+    let resp = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    check_response(resp).await
+}
+
+/// Export a Spotify playlist (create new or overwrite existing).
+///
+/// Routes based on `payload["mode"]`:
+///   - `"new"`       → `POST /export/new`
+///   - `"overwrite"` → `POST /export/overwrite/{playlist_id}`
+///
+/// For `"new"` the payload must include `{ name, description, track_ids, token }`.
+/// For `"overwrite"` the payload must include `{ playlist_id, track_ids, token }`.
+#[tauri::command]
+pub async fn export_playlist(payload: Value) -> Result<Value, String> {
+    let mode = payload["mode"].as_str().unwrap_or("new");
+    let url = if mode == "overwrite" {
+        let pid = payload["playlist_id"].as_str().unwrap_or("");
+        format!("{}/export/overwrite/{}", sidecar_base(), pid)
+    } else {
+        format!("{}/export/new", sidecar_base())
+    };
+    let client = Client::new();
+    let resp = client
+        .post(&url)
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| e.to_string())?;
+    check_response(resp).await
+}

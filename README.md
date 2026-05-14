@@ -25,9 +25,11 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 | Sprint 3 | Home screen, Seed flows, D3 Insights charts (donut + stacked area) | ✅ Done |
 | Sprint 4 | Refinement screen (7 sliders + genre filter/boost), Export to Spotify | ✅ Done |
 | Sprint 5 | Settings, AI Prompt placeholder, storage/auth endpoints | ✅ Done |
-| Sprint 6 | Accessibility pass, Home IPC wiring, Inter font, packaging config, logout | 🔄 In Progress |
+| Sprint 6 | Accessibility pass, Home IPC wiring, Inter font, packaging config, logout | ✅ Done |
+| Sprint 7 | (previous sprint work) | ✅ Done |
+| Sprint 8 | Discovery Mode (swipe cards, keyboard nav, queue drawer, export), Settings AI status | 🔄 In Progress |
 
-**Test coverage**: 87 Python pytest · 83 Vitest (11 test files) — all passing on `sprint/6-polish-packaging`.
+**Test coverage**: 88 Python pytest · 100+ Vitest (13+ test files) — all passing on `sprint/8-discovery-mode`.
 
 ## Features
 
@@ -37,6 +39,7 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 - **Refinement** — 7 audio-feature sliders (energy, tempo, valence, danceability, acousticness, instrumentalness, popularity), genre filter/boost via donut clicks, live track preview with position deltas
 - **Export** — save refined playlist to Spotify as a new playlist or overwrite an existing one
 - **Settings** — Spotify account info, logout (keychain clear), database export/import, app version
+- **Discovery Mode** — swipe-card discovery session: keep (→) or skip (←) tracks one at a time, keyboard shortcuts, queue drawer, export kept tracks to Spotify
 - **AI Prompt** — placeholder screen for V2 AI playlist generation (Coming Soon)
 - **Accessibility** — `aria-label`, `role="region"` / `role="main"` across all screens, labelled nav
 

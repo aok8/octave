@@ -223,6 +223,76 @@ export function Settings() {
         </div>
       </div>
 
+      {/* ── AI Provider section ─────────────────────────────────────────────── */}
+      <div
+        data-testid="settings-ai-status"
+        role="region"
+        aria-label="AI provider status"
+        style={sectionStyle}
+      >
+        <p style={sectionLabelStyle}>AI Provider</p>
+
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <span
+            data-testid="settings-ai-openrouter-chip"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 12px",
+              borderRadius: 20,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.04)",
+              fontSize: 12,
+              color: "rgba(255,255,255,0.40)",
+            }}
+          >
+            OpenRouter
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "rgba(255,255,255,0.25)",
+                display: "inline-block",
+              }}
+            />
+            Offline
+          </span>
+
+          <span
+            data-testid="settings-ai-ollama-chip"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "4px 12px",
+              borderRadius: 20,
+              border: "1px solid rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.04)",
+              fontSize: 12,
+              color: "rgba(255,255,255,0.40)",
+            }}
+          >
+            Local (Ollama)
+            <span
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: "rgba(255,255,255,0.25)",
+                display: "inline-block",
+              }}
+            />
+            Offline
+          </span>
+        </div>
+
+        <p style={{ fontSize: 12, color: "rgba(255,255,255,0.30)", margin: 0 }}>
+          AI features coming in V2.
+        </p>
+      </div>
+
       {/* ── App Info section ────────────────────────────────────────────────── */}
       <div data-testid="settings-app-info" role="region" aria-label="App Info" style={sectionStyle}>
         <p style={sectionLabelStyle}>App Info</p>

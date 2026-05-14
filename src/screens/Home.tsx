@@ -18,7 +18,7 @@ const TAGLINES = [
 // ── Creation card types ───────────────────────────────────────────────────────
 
 interface CreationCard {
-  id: "seed-playlist" | "seed-song" | "ai-prompt";
+  id: "seed-playlist" | "seed-song" | "ai-prompt" | "discovery";
   title: string;
   description: string;
   icon: React.ReactNode;
@@ -52,10 +52,18 @@ function AIIcon() {
   );
 }
 
+function DiscoveryIcon() {
+  return (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13l-1 5.5 5.5-1-1-5.5L10 7zm1 6c-.55 0-1-.45-1-1s.45-1 1-1 1 .45 1 1-.45 1-1 1z" />
+    </svg>
+  );
+}
+
 // ── Home screen ───────────────────────────────────────────────────────────────
 
 interface HomeProps {
-  onNavigate?: (screen: "seed-playlist" | "seed-song") => void;
+  onNavigate?: (screen: "seed-playlist" | "seed-song" | "discover") => void;
 }
 
 export function Home({ onNavigate }: HomeProps) {
@@ -116,6 +124,13 @@ export function Home({ onNavigate }: HomeProps) {
       description: "Describe a vibe and let Octave build the playlist.",
       icon: <AIIcon />,
       disabled: true,
+    },
+    {
+      id: "discovery",
+      title: "Discovery Mode",
+      description: "Explore tracks one by one and build a playlist from what you love.",
+      icon: <DiscoveryIcon />,
+      onClick: () => onNavigate?.("discover"),
     },
   ];
 

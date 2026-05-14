@@ -20,11 +20,21 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 
 | Sprint | Focus | Status |
 |---|---|---|
-| Sprint 1 | Tauri scaffold, auth, SQLite schema, sidecar health | ✅ Done |
-| Sprint 2 | Playlist fetch/cache, audio features, search/recs, UI components | ✅ Done |
-| Sprint 3 | Home screen, Seed flows, D3 Insights charts | 🔜 Next |
-| Sprint 4 | AI playlist generation (F-14 guardrail system) | ⏳ Planned |
-| Sprint 5 | Polish, packaging, export | ⏳ Planned |
+| Sprint 1 | Tauri scaffold, Spotify auth (PKCE), SQLite schema, Python sidecar | ✅ Done |
+| Sprint 2 | Playlist/track/audio-features pipeline, SQLite cache, UI component library | ✅ Done |
+| Sprint 3 | Home screen, Seed flows, D3 Insights charts (donut + stacked area) | ✅ Done |
+| Sprint 4 | Refinement screen (7 sliders + genre filter/boost), Export to Spotify | ✅ Done |
+| Sprint 5 | Settings, accessibility, packaging (Windows + Linux), polish | 🔜 Next |
+
+**Test coverage**: 78 Python pytest · 68 Vitest (9 test files) — all passing on `master`.
+
+## Features
+
+- **Seed Playlist** — browse your Spotify library, select a playlist, view full tracklist
+- **Seed Song** — search Spotify catalog, pick a track, get AI-powered recommendations
+- **Insights** — interactive D3 donut chart (genre breakdown) + stacked area chart (mood/energy flow)
+- **Refinement** — 7 audio-feature sliders (energy, tempo, valence, danceability, acousticness, instrumentalness, popularity), genre filter/boost via donut clicks, live track preview with position deltas
+- **Export** — save refined playlist to Spotify as a new playlist or overwrite an existing one
 
 ## Getting Started
 
@@ -44,7 +54,7 @@ npm install
 # Install Python sidecar deps
 pip install -r src-python/requirements.txt
 
-# Run Tauri dev mode (launches frontend + Rust shell)
+# Run Tauri dev mode (launches frontend + Rust shell + Python sidecar)
 npm run tauri dev
 ```
 
@@ -58,11 +68,11 @@ python main.py        # starts FastAPI on port 8000
 ### Tests
 
 ```bash
-# Python sidecar tests
+# Python sidecar tests (78 tests)
 cd src-python
 python -m pytest tests/ -v
 
-# Frontend component tests
+# Frontend component + screen tests (68 tests)
 npx vitest run
 ```
 
@@ -75,20 +85,29 @@ npx vitest run
 │  • OS keychain (token storage)          │
 │  • SQLite migrations (sqlx)             │
 │  • Python sidecar lifecycle             │
+│  • IPC commands → Python sidecar        │
 └────────────┬────────────────────────────┘
-             │ IPC (Tauri commands)
+             │ IPC (Tauri invoke)
 ┌────────────▼────────────────────────────┐
 │  React Frontend (TypeScript/Vite)       │
-│  • Dark glassmorphism UI                │
-│  • D3.js audio feature charts           │
-│  • Framer Motion transitions            │
+│  • Home, SeedPlaylist, SeedSong         │
+│  • Insights (D3 donut + area charts)    │
+│  • Refinement (sliders + genre donut)   │
+│  • Export modal                         │
+│  • Framer Motion page transitions       │
 └────────────┬────────────────────────────┘
              │ HTTP (localhost:8000)
 ┌────────────▼────────────────────────────┐
 │  Python Sidecar (FastAPI)               │
-│  • /playlists   stale-while-revalidate  │
-│  • /tracks/audio-features  batch+cache  │
-│  • /search/tracks   /search/recommendations │
+│  • GET  /playlists          (SWR cache) │
+│  • GET  /playlists/{id}/tracks          │
+│  • GET  /tracks/audio-features          │
+│  • GET  /search/tracks                  │
+│  • GET  /search/recommendations         │
+│  • GET  /insights/{playlist_id}         │
+│  • POST /refine                         │
+│  • POST /export/new                     │
+│  • POST /export/overwrite/{id}          │
 │  • SQLite read/write (shared DB)        │
 └─────────────────────────────────────────┘
 ```

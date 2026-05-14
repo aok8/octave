@@ -24,9 +24,11 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 | Sprint 2 | Playlist/track/audio-features pipeline, SQLite cache, UI component library | ✅ Done |
 | Sprint 3 | Home screen, Seed flows, D3 Insights charts (donut + stacked area) | ✅ Done |
 | Sprint 4 | Refinement screen (7 sliders + genre filter/boost), Export to Spotify | ✅ Done |
-| Sprint 5 | Settings, accessibility, packaging (Windows + Linux), polish | 🔄 In Progress |
+| Sprint 5 | Settings, AI Prompt placeholder, storage/auth endpoints | ✅ Done |
+| Sprint 6 | Accessibility pass, Home IPC wiring, Inter font, packaging config, logout | ✅ Done |
+| Sprint 7 | CI pipeline, artist genre fix (R-08), skeleton polish, page transitions | 🔄 In Progress |
 
-**Test coverage**: 86 Python pytest · 79 Vitest (11 test files) — all passing on `sprint/5-settings-polish`.
+**Test coverage**: 88 Python pytest · 84 Vitest (12 test files) — all passing on `sprint/7-ci-genre-polish`.
 
 ## Features
 
@@ -35,8 +37,10 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 - **Insights** — interactive D3 donut chart (genre breakdown) + stacked area chart (mood/energy flow)
 - **Refinement** — 7 audio-feature sliders (energy, tempo, valence, danceability, acousticness, instrumentalness, popularity), genre filter/boost via donut clicks, live track preview with position deltas
 - **Export** — save refined playlist to Spotify as a new playlist or overwrite an existing one
-- **Settings** — Spotify account info, logout, database export/import, app version
+- **Settings** — Spotify account info, logout (keychain clear), database export/import, app version
 - **AI Prompt** — placeholder screen for V2 AI playlist generation (Coming Soon)
+- **Accessibility** — `aria-label`, `role="region"` / `role="main"` across all screens, labelled nav
+- **Genre classification** — artist genres fetched from Spotify and stored per-track; Insights donut and Refinement ranker use real genre data (not "Other" for all tracks)
 
 ## Getting Started
 

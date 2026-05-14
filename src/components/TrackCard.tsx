@@ -53,11 +53,14 @@ function gradientForId(id: string): string {
 interface TrackCardProps {
   track: Track;
   features?: AudioFeatures;
+  /** Alias for features — accepted for test compatibility */
+  audioFeatures?: AudioFeatures;
   genres?: GenreBucket[];
   onClick?: () => void;
 }
 
-export function TrackCard({ track, features, genres, onClick }: TrackCardProps) {
+export function TrackCard({ track, features, audioFeatures, genres, onClick }: TrackCardProps) {
+  const resolvedFeatures = features ?? audioFeatures;
   const [hovered, setHovered] = useState(false);
   const [imgError, setImgError] = useState(false);
 
@@ -158,8 +161,9 @@ export function TrackCard({ track, features, genres, onClick }: TrackCardProps) 
       )}
 
       {/* Row 3: audio feature bars */}
-      {features && (
+      {resolvedFeatures && (
         <div
+          className="audio-feature"
           style={{
             display: "flex",
             alignItems: "flex-end",
@@ -169,13 +173,14 @@ export function TrackCard({ track, features, genres, onClick }: TrackCardProps) 
           }}
         >
           {FEATURE_DOTS.map(({ key, color, label }) => {
-            const raw = features[key] as number | undefined;
+            const raw = resolvedFeatures[key] as number | undefined;
             if (raw == null) return null;
             const norm = normalizeValue(key, raw);
             const barH = Math.round(4 + norm * 12); // 4–16 px
             return (
               <div
                 key={key}
+                data-testid="audio-feature-bar"
                 title={`${label}: ${key === "tempo" ? Math.round(raw) + " BPM" : norm.toFixed(2)}`}
                 style={{
                   width: 4,
@@ -193,3 +198,5 @@ export function TrackCard({ track, features, genres, onClick }: TrackCardProps) 
     </div>
   );
 }
+
+export default TrackCard;

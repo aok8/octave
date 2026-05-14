@@ -255,3 +255,52 @@ def update_recently_used(conn: sqlite3.Connection, playlist_id: str) -> None:
         (playlist_id, int(time.time())),
     )
     conn.commit()
+
+
+# ---------------------------------------------------------------------------
+# Interaction log helpers
+# ---------------------------------------------------------------------------
+
+
+def log_interaction(
+    conn: sqlite3.Connection, event_type: str, payload: dict
+) -> None:
+    """Append a row to interaction_log.
+
+    The schema stores optional ``playlist_id`` and ``track_id`` columns as
+    well as a free-form ``event_data`` TEXT column (JSON).  We extract known
+    keys from *payload* into their dedicated columns and store the full dict
+    as JSON in ``event_data`` for future-proofing.
+    """
+    import json
+
+    conn.execute(
+        """
+        INSERT INTO interaction_log
+            (event_type, playlist_id, track_id, event_data, created_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            event_type,
+            payload.get("playlist_id"),
+            payload.get("track_id"),
+            json.dumps(payload),
+            int(time.time()),
+        ),
+    )
+    conn.commit()
+
+
+def get_recently_used(conn: sqlite3.Connection, limit: int = 10) -> list:
+    """Return recently used playlists ordered by access time descending."""
+    cursor = conn.execute(
+        """
+        SELECT ru.playlist_id, ru.accessed_at, p.name, p.cover_url, p.track_count
+        FROM recently_used ru
+        LEFT JOIN playlists p ON ru.playlist_id = p.id
+        ORDER BY ru.accessed_at DESC
+        LIMIT ?
+        """,
+        (limit,),
+    )
+    return [dict(row) for row in cursor.fetchall()]

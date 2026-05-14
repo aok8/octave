@@ -126,3 +126,5 @@ export function PlaylistCard({ playlist, onClick }: PlaylistCardProps) {
     </motion.div>
   );
 }
+
+export default PlaylistCard;

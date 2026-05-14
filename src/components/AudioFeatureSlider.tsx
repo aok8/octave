@@ -151,7 +151,7 @@ function ensureSliderStyles() {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface AudioFeatureSliderProps {
-  feature: keyof AudioFeatures;
+  feature: keyof AudioFeatures | (string & {});
   value: number;
   min?: number;
   max?: number;
@@ -170,7 +170,7 @@ export function AudioFeatureSlider({
   ensureSliderStyles();
   const uid = useId();
 
-  const cfg = FEATURE_CONFIG[feature] ?? FEATURE_CONFIG.energy;
+  const cfg = FEATURE_CONFIG[feature as keyof AudioFeatures] ?? FEATURE_CONFIG.energy;
   const min = minOverride ?? cfg.min;
   const max = maxOverride ?? cfg.max;
   const label = labelOverride ?? cfg.label;
@@ -260,3 +260,5 @@ export function AudioFeatureSlider({
     </div>
   );
 }
+
+export default AudioFeatureSlider;

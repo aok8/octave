@@ -4,7 +4,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from routers import playlists, tracks, search
+from routers import playlists, tracks, search, insights, refine, export
 import uvicorn
 
 app = FastAPI(title="Octave API", version="2.0.0")
@@ -19,6 +19,9 @@ app.add_middleware(
 app.include_router(playlists.router, prefix="/playlists", tags=["playlists"])
 app.include_router(tracks.router, prefix="/tracks", tags=["tracks"])
 app.include_router(search.router, prefix="/search", tags=["search"])
+app.include_router(insights.router, prefix="/insights", tags=["insights"])
+app.include_router(refine.router, prefix="/refine", tags=["refine"])
+app.include_router(export.router, prefix="/export", tags=["export"])
 
 
 @app.get("/health")

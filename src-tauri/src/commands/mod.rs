@@ -1,8 +1,8 @@
 pub mod api;
 
 pub use api::{
-    fetch_audio_features, fetch_playlist_tracks, fetch_playlists, fetch_recommendations,
-    search_tracks,
+    export_playlist, fetch_audio_features, fetch_insights, fetch_playlist_tracks, fetch_playlists,
+    fetch_recommendations, refine_playlist, search_tracks,
 };
 
 use crate::auth::{self, AuthStateInfo, OAuthState};

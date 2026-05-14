@@ -31,8 +31,9 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 | Sprint 9 | AI Playlist Generation (OpenRouter + Ollama), Discovery seed wiring (R-11) | ✅ Done |
 | Sprint 10 | Fix deprecated Spotify endpoints (audio features fallback, artist-search recommendations) | ✅ Done |
 | Sprint 11 | CI Rust check, Inter font bundling, MIT LICENSE, NSIS path fix | ✅ Done |
+| Sprint 12 | GET /health test, WCAG AA axe-core audit (9 screens, 0 violations), Cargo.lock | ✅ Done |
 
-**Test coverage**: 125 Python pytest · 110 Vitest (14 test files) — all passing on `master`.
+**Test coverage**: 125 Python pytest · 119 Vitest (15 test files) — all passing on `master`.
 
 ## Features
 

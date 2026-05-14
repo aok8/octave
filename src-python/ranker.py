@@ -10,6 +10,10 @@ rank_tracks(track_pool, constraints, genre_config) -> dict
 
 from __future__ import annotations
 
+import json as _json
+
+from genre import classify_genre
+
 
 def rank_tracks(
     track_pool: list[dict],
@@ -71,7 +75,16 @@ def rank_tracks(
 
     for track in track_pool:
         track_id = track.get("track_id", "")
-        genre = track.get("genre", "Other") or "Other"
+        raw_genres_str = track.get("genres")
+        if raw_genres_str:
+            try:
+                raw_genres = _json.loads(raw_genres_str) if isinstance(raw_genres_str, str) else raw_genres_str
+            except Exception:
+                raw_genres = []
+            track_genre = classify_genre(raw_genres)
+        else:
+            track_genre = "Other"
+        genre = track.get("genre") or track_genre
 
         # --- Genre exclusion filter ---
         if genre in exclude_genres:

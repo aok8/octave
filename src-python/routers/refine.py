@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from db import get_cached_features, get_db, log_interaction
+from db import get_cached_features, get_cached_tracks, get_db, log_interaction
 from ranker import rank_tracks
 
 router = APIRouter()
@@ -51,18 +51,11 @@ class RefineRequest(BaseModel):
 def refine_playlist(body: RefineRequest):
     """Filter and re-rank the given track pool.
 
-    Genre classification note (v1 limitation)
-    ------------------------------------------
-    The ``tracks`` table does not store Spotify artist genre strings — the
-    current ingestion pipeline does not call the Spotify artist endpoint.
-    Until artist genres are available, every track is classified as ``"Other"``.
-    All genre-based operations (exclude/boost) therefore have no effect in
-    production unless callers inject genre data via a future API revision.
-
     Steps
     -----
-    1. Fetch audio features for all requested track IDs from SQLite.
-    2. Build the track pool (default genre = "Other" for all tracks).
+    1. Fetch audio features and track rows (for stored genres) from SQLite.
+    2. Build the track pool, passing stored genres so ``rank_tracks`` can
+       classify each track into the correct genre bucket.
     3. Delegate to ``rank_tracks()`` from ``ranker.py``.
     4. Log a ``refine_applied`` event with the playlist_id and active
        constraint count.
@@ -79,8 +72,11 @@ def refine_playlist(body: RefineRequest):
                 detail=f"No audio features found for any of the provided track IDs",
             )
 
+        # --- Fetch stored genres from tracks table ---
+        tracks_rows = get_cached_tracks(conn, body.playlist_id)
+        genres_by_id: Dict[str, Any] = {row["id"]: row.get("genres") for row in tracks_rows}
+
         # --- Build track pool ---
-        # Genre is always "Other" in v1 (no artist genre data in DB).
         track_pool: List[Dict[str, Any]] = []
         for track_id in body.track_ids:
             feats = features_by_id.get(track_id)
@@ -97,8 +93,8 @@ def refine_playlist(body: RefineRequest):
                     "acousticness": feats.get("acousticness"),
                     "instrumentalness": feats.get("instrumentalness"),
                     "popularity": feats.get("popularity"),
-                    # v1: no per-track genre data; defaulting to "Other"
-                    "genre": "Other",
+                    # Pass raw genres JSON string; ranker.py will classify via classify_genre
+                    "genres": genres_by_id.get(track_id),
                 }
             )
 

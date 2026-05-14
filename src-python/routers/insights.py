@@ -11,13 +11,14 @@ Optional query parameter:
 
 from __future__ import annotations
 
+import json as _json
 import random
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
 from db import get_cached_features, get_cached_tracks, get_db, log_interaction
-from genre import GENRE_COLORS
+from genre import GENRE_COLORS, classify_genre
 
 router = APIRouter()
 
@@ -53,12 +54,9 @@ def get_insights(
 ):
     """Return genre breakdown and timeline for a playlist.
 
-    Genre classification note (v1 limitation)
-    ------------------------------------------
-    The ``tracks`` table does not store Spotify artist genre strings — those
-    come from a separate Spotify artist endpoint and are not cached by the
-    current ingestion pipeline.  Until artist genres are ingested, every
-    track is classified as ``"Other"``.
+    Genre classification uses stored artist genres from the ``tracks`` table
+    (populated by the batch artist-fetch step in the track ingestion pipeline).
+    Tracks without stored genres fall back to ``"Other"``.
 
     Pass ``?mock_genres=true`` to receive a representative, diverse genre
     distribution for demo / fixture purposes.
@@ -91,10 +89,16 @@ def get_insights(
             pos = track.get("position", 0)
             feats = features_by_id.get(tid, {})
 
-            # Genre assignment
-            # v1: no artist genre data in DB → default "Other" unless mock requested
+            # Genre assignment — use stored artist genres if available
+            raw_genres_str = track.get("genres")  # JSON string from DB, may be None
             if mock_genres:
                 genre = _assign_mock_genre(pos)
+            elif raw_genres_str:
+                try:
+                    raw_genres = _json.loads(raw_genres_str) if isinstance(raw_genres_str, str) else raw_genres_str
+                except Exception:
+                    raw_genres = []
+                genre = classify_genre(raw_genres)
             else:
                 genre = "Other"
 

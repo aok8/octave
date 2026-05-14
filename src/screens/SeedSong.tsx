@@ -165,7 +165,7 @@ export function SeedSong({ onBack }: SeedSongProps) {
       {searchError ? (
         <ErrorState message={searchError} onRetry={() => setQuery(query)} />
       ) : searchLoading ? (
-        <LoadingState type="list" rows={5} />
+        <LoadingState type="list" rows={4} />
       ) : searchResults.length > 0 ? (
         <section style={{ marginBottom: 32 }}>
           <h2

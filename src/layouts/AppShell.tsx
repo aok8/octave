@@ -243,10 +243,10 @@ export function AppShell({ children, activeNav: controlledNav, onNavChange }: Ap
           <AnimatePresence mode="wait">
             <motion.div
               key={activeNav}
-              initial={{ opacity: 0, y: 8 }}
+              initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.2, ease: "easeOut" }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
               style={{ width: "100%", height: "100%" }}
             >
               {children}

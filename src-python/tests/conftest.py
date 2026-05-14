@@ -11,11 +11,14 @@ def tmp_db(tmp_path):
     """Create a temporary SQLite DB with the Octave schema for testing."""
     db_path = tmp_path / "test_octave.db"
     conn = sqlite3.connect(str(db_path))
-    migration_path = os.path.join(
-        os.path.dirname(__file__), "..", "..", "src-tauri", "migrations", "001_initial_schema.sql"
+    migrations_dir = os.path.join(
+        os.path.dirname(__file__), "..", "..", "src-tauri", "migrations"
     )
-    with open(migration_path) as f:
-        conn.executescript(f.read())
+    for migration_file in sorted(os.listdir(migrations_dir)):
+        if migration_file.endswith(".sql"):
+            migration_path = os.path.join(migrations_dir, migration_file)
+            with open(migration_path) as f:
+                conn.executescript(f.read())
     conn.commit()
     conn.close()
     os.environ["OCTAVE_DB_PATH"] = str(db_path)

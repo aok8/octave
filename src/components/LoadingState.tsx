@@ -115,11 +115,35 @@ function ChartSkeleton() {
   return <Shimmer width="100%" height={240} style={{ borderRadius: 8 }} />;
 }
 
+// ── Track skeleton (single TrackCard-shaped row) ──────────────────────────────
+
+function TrackSkeleton() {
+  return (
+    <div style={{ display: "flex", gap: 12, padding: "8px 0", alignItems: "center" }}>
+      <Shimmer width={40} height={40} style={{ borderRadius: 4, flexShrink: 0 }} />
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
+        <Shimmer width="60%" height={13} />
+        <Shimmer width="40%" height={11} />
+      </div>
+    </div>
+  );
+}
+
+function TrackListSkeleton({ rows }: { rows: number }) {
+  return (
+    <div>
+      {Array.from({ length: rows }).map((_, i) => (
+        <TrackSkeleton key={i} />
+      ))}
+    </div>
+  );
+}
+
 // ── LoadingState ──────────────────────────────────────────────────────────────
 
 interface LoadingStateProps {
   rows?: number;
-  type?: "list" | "card" | "chart";
+  type?: "list" | "card" | "chart" | "track";
 }
 
 export function LoadingState({ rows = 5, type = "list" }: LoadingStateProps) {
@@ -134,6 +158,7 @@ export function LoadingState({ rows = 5, type = "list" }: LoadingStateProps) {
       {type === "list" && <ListSkeleton rows={rows} />}
       {type === "card" && <CardSkeleton rows={rows} />}
       {type === "chart" && <ChartSkeleton />}
+      {type === "track" && <TrackListSkeleton rows={rows} />}
     </div>
   );
 }

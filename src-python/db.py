@@ -401,3 +401,32 @@ def get_recently_used(conn: sqlite3.Connection, limit: int = 10) -> list:
         (limit,),
     )
     return [dict(row) for row in cursor.fetchall()]
+
+
+# ---------------------------------------------------------------------------
+# AI config helpers
+# ---------------------------------------------------------------------------
+
+
+def get_ai_config(conn: sqlite3.Connection, key: str) -> Optional[str]:
+    """Return the value for an ai_config key, or None if not set."""
+    cursor = conn.execute(
+        "SELECT value FROM ai_config WHERE key = ?",
+        (key,),
+    )
+    row = cursor.fetchone()
+    return row["value"] if row else None
+
+
+def set_ai_config(conn: sqlite3.Connection, key: str, value: str) -> None:
+    """Insert or replace an ai_config row."""
+    conn.execute(
+        """
+        INSERT INTO ai_config (key, value, updated_at)
+        VALUES (?, ?, strftime('%s','now'))
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value,
+                                       updated_at = excluded.updated_at
+        """,
+        (key, value),
+    )
+    conn.commit()

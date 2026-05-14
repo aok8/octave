@@ -1,6 +1,8 @@
+pub mod ai_cmd;
 pub mod api;
 pub mod discovery;
 
+pub use ai_cmd::{generate_ai_playlist, get_ai_status, set_ai_key};
 pub use api::{
     export_db, export_playlist, fetch_audio_features, fetch_insights, fetch_playlist_tracks,
     fetch_playlists, fetch_recommendations, get_recently_used, get_user_profile, import_db,

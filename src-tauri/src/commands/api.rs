@@ -12,14 +12,14 @@ use reqwest::Client;
 use serde_json::Value;
 
 /// Returns the base URL for the sidecar, e.g. "http://127.0.0.1:8000".
-fn sidecar_base() -> String {
+pub(super) fn sidecar_base() -> String {
     let port = std::env::var("OCTAVE_SIDECAR_PORT").unwrap_or_else(|_| "8000".to_string());
     format!("http://127.0.0.1:{port}")
 }
 
 /// Maps a reqwest error or an unexpected status code into a human-readable
 /// `String` that Tauri's `Result<_, String>` return type expects.
-async fn check_response(resp: reqwest::Response) -> Result<Value, String> {
+pub(super) async fn check_response(resp: reqwest::Response) -> Result<Value, String> {
     let status = resp.status();
     if status.is_success() {
         resp.json::<Value>()

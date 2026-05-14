@@ -9,6 +9,7 @@ import { ErrorState } from "./components/ErrorState";
 import { Settings } from "./screens/Settings";
 import { AIPrompt } from "./screens/AIPrompt";
 import { DiscoveryMode } from "./screens/DiscoveryMode";
+import { SeedSong } from "./screens/SeedSong";
 import {
   mockTracks,
   mockPlaylists,
@@ -127,24 +128,42 @@ function StatesPage() {
 
 type PageId = "home" | "library" | "create" | "ai-prompt" | "discover" | "settings";
 
-const PAGE_MAP: Record<PageId, React.ReactNode> = {
-  home: <TracksPage />,
-  library: <PlaylistsPage />,
-  create: <SlidersPage />,
-  "ai-prompt": <AIPrompt />,
-  discover: <DiscoveryMode />,
-  settings: <Settings />,
-};
-
 function App() {
   const [activePage, setActivePage] = useState<PageId>("home");
+  const [discoverySeedId, setDiscoverySeedId] = useState<string | undefined>(undefined);
+
+  function renderPage() {
+    switch (activePage) {
+      case "discover":
+        return <DiscoveryMode seedTrackId={discoverySeedId} />;
+      case "create":
+        return (
+          <SeedSong
+            onDiscover={(id) => {
+              setDiscoverySeedId(id);
+              setActivePage("discover");
+            }}
+          />
+        );
+      case "home":
+        return <TracksPage />;
+      case "library":
+        return <PlaylistsPage />;
+      case "ai-prompt":
+        return <AIPrompt />;
+      case "settings":
+        return <Settings />;
+      default:
+        return <TracksPage />;
+    }
+  }
 
   return (
     <AppShell
       activeNav={activePage}
       onNavChange={(id) => setActivePage(id as PageId)}
     >
-      {PAGE_MAP[activePage]}
+      {renderPage()}
     </AppShell>
   );
 }

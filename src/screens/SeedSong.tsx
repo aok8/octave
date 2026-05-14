@@ -9,9 +9,10 @@ import type { Track } from "../types";
 
 interface SeedSongProps {
   onBack?: () => void;
+  onDiscover?: (trackId: string) => void;
 }
 
-export function SeedSong({ onBack }: SeedSongProps) {
+export function SeedSong({ onBack, onDiscover }: SeedSongProps) {
   const [query, setQuery] = useState("");
   const [searchResults, setSearchResults] = useState<Track[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
@@ -255,6 +256,29 @@ export function SeedSong({ onBack }: SeedSongProps) {
               {recommendations.map((track) => (
                 <TrackCard key={track.id} track={track} />
               ))}
+            </div>
+          )}
+
+          {/* Discover button — shown when track is selected and not loading */}
+          {!recsLoading && !recsError && onDiscover && (
+            <div style={{ marginTop: 20 }}>
+              <button
+                data-testid="seed-song-discover-btn"
+                onClick={() => onDiscover(selectedTrack.id)}
+                style={{
+                  padding: "11px 24px",
+                  borderRadius: 8,
+                  border: "none",
+                  background: "#1DB9FF",
+                  color: "#000",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  fontFamily: "inherit",
+                  cursor: "pointer",
+                }}
+              >
+                Discover from this track
+              </button>
             </div>
           )}
         </section>

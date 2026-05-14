@@ -28,9 +28,9 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 | Sprint 6 | Accessibility pass, Home IPC wiring, Inter font, packaging config, logout | ✅ Done |
 | Sprint 7 | (previous sprint work) | ✅ Done |
 | Sprint 8 | Discovery Mode (swipe cards, keyboard nav, queue drawer, export), Settings AI status | ✅ Done |
-| Sprint 9 | AI Playlist Generation (OpenRouter + Ollama), Discovery seed wiring (R-11) | 🔄 In Progress |
+| Sprint 9 | AI Playlist Generation (OpenRouter + Ollama), Discovery seed wiring (R-11) | ✅ Done |
 
-**Test coverage**: 103 Python pytest · 115+ Vitest (14+ test files) — all passing on `sprint/9-ai-generation`.
+**Test coverage**: 123 Python pytest · 110 Vitest (14 test files) — all passing on `master`.
 
 ## Features
 
@@ -49,7 +49,7 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 ### Prerequisites
 
 - [Rust](https://rustup.rs/) (stable)
-- [Node.js](https://nodejs.org/) 18+
+- [Node.js](https://nodejs.org/) 20+
 - Python 3.11+
 - [Tauri CLI v2](https://tauri.app/start/prerequisites/)
 
@@ -76,11 +76,11 @@ python main.py        # starts FastAPI on port 8000
 ### Tests
 
 ```bash
-# Python sidecar tests (86 tests)
+# Python sidecar tests (123 tests)
 cd src-python
 python -m pytest tests/ -v
 
-# Frontend component + screen tests (79 tests)
+# Frontend component + screen tests (110 tests)
 npx vitest run
 ```
 
@@ -102,8 +102,9 @@ npx vitest run
 │  • Insights (D3 donut + area charts)    │
 │  • Refinement (sliders + genre donut)   │
 │  • Export modal                         │
-│  • Settings, AI Prompt placeholder      │
-│  • Framer Motion page transitions       │
+│  • Discovery Mode (swipe cards)         │
+│  • AI Playlist Generation               │
+│  • Settings, Framer Motion transitions  │
 └────────────┬────────────────────────────┘
              │ HTTP (localhost:8000)
 ┌────────────▼────────────────────────────┐
@@ -121,6 +122,11 @@ npx vitest run
 │  • GET  /auth/profile                   │
 │  • POST /storage/export                 │
 │  • POST /storage/import                 │
+│  • POST /discovery/start                │
+│  • POST /discovery/feedback             │
+│  • POST /discovery/end                  │
+│  • POST /ai/generate                    │
+│  • POST /ai/key · GET /ai/status        │
 │  • SQLite read/write (shared DB)        │
 └─────────────────────────────────────────┘
 ```

@@ -57,6 +57,7 @@ export function AIPrompt() {
       {/* Disabled prompt textarea */}
       <textarea
         data-testid="ai-prompt-input"
+        aria-label="AI prompt input"
         disabled
         placeholder="Describe the playlist you want to generate…"
         rows={5}

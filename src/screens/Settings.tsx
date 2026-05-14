@@ -132,7 +132,7 @@ export function Settings() {
       </div>
 
       {/* ── Spotify Account section ─────────────────────────────────────────── */}
-      <div data-testid="settings-account-section" style={sectionStyle}>
+      <div data-testid="settings-account-section" role="region" aria-label="Spotify Account" style={sectionStyle}>
         <p style={sectionLabelStyle}>Spotify Account</p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -166,7 +166,7 @@ export function Settings() {
       </div>
 
       {/* ── Storage section ─────────────────────────────────────────────────── */}
-      <div data-testid="settings-storage-section" style={sectionStyle}>
+      <div data-testid="settings-storage-section" role="region" aria-label="Storage" style={sectionStyle}>
         <p style={sectionLabelStyle}>Storage</p>
 
         {/* Export DB */}
@@ -224,7 +224,7 @@ export function Settings() {
       </div>
 
       {/* ── App Info section ────────────────────────────────────────────────── */}
-      <div data-testid="settings-app-info" style={sectionStyle}>
+      <div data-testid="settings-app-info" role="region" aria-label="App Info" style={sectionStyle}>
         <p style={sectionLabelStyle}>App Info</p>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <div style={{ display: "flex", gap: 8 }}>

@@ -156,7 +156,7 @@ export function SeedPlaylist({ onBack }: SeedPlaylistProps) {
 
       {/* ── Playlist grid ────────────────────────────────────────────────── */}
       {loading ? (
-        <LoadingState type="card" rows={6} />
+        <LoadingState type="list" rows={5} />
       ) : error ? (
         <ErrorState message={error} onRetry={fetchPlaylists} />
       ) : filteredPlaylists.length === 0 ? (

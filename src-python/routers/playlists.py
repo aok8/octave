@@ -26,6 +26,7 @@ from db import (
     get_recently_used,
     log_interaction,
     update_recently_used,
+    update_track_genres,
     upsert_playlist,
     upsert_playlist_track,
     upsert_track,
@@ -105,12 +106,14 @@ def _spotify_track_to_dict(item: dict) -> dict:
     if track is None:
         return {}
     artists = [a.get("name", "") for a in (track.get("artists") or [])]
+    artist_ids = [a.get("id", "") for a in (track.get("artists") or []) if a.get("id")]
     images = (track.get("album") or {}).get("images") or []
     album_art_url = images[0]["url"] if images else None
     return {
         "id": track["id"],
         "name": track.get("name", ""),
         "artist_names": artists,
+        "artist_ids": artist_ids,
         "album_name": (track.get("album") or {}).get("name"),
         "album_art_url": album_art_url,
         "duration_ms": track.get("duration_ms"),
@@ -278,6 +281,32 @@ def get_playlist_tracks(
                 response = sp.next(response)
             else:
                 break
+
+        # --- Batch-fetch artist genres and update tracks ---
+        # Collect unique artist IDs from all ingested tracks
+        all_artist_ids: list[str] = []
+        artist_to_tracks: dict[str, list[str]] = {}  # artist_id → [track_id, ...]
+        for row in tracks_out:
+            for aid in (row.get("artist_ids") or []):
+                if aid and aid not in artist_to_tracks:
+                    all_artist_ids.append(aid)
+                artist_to_tracks.setdefault(aid, []).append(row["id"])
+
+        # Fetch in batches of 50 (Spotify API limit)
+        for i in range(0, len(all_artist_ids), 50):
+            batch = all_artist_ids[i : i + 50]
+            try:
+                result = sp.artists(batch)
+                for artist in (result.get("artists") or []):
+                    if artist is None:
+                        continue
+                    aid = artist.get("id")
+                    genres = artist.get("genres") or []
+                    if aid and genres:
+                        for tid in artist_to_tracks.get(aid, []):
+                            update_track_genres(conn, tid, genres)
+            except Exception:
+                pass  # Genre enrichment is best-effort; never block track delivery
 
         update_recently_used(conn, playlist_id)
         return [_response_track(row) for row in tracks_out]

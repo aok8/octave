@@ -167,7 +167,10 @@ export function Insights({ playlistId, onBack }: InsightsProps) {
 
       {/* ── Content ──────────────────────────────────────────────────────── */}
       {loading ? (
-        <LoadingState type="chart" />
+        <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          <LoadingState type="chart" />
+          <LoadingState type="list" rows={5} />
+        </div>
       ) : error ? (
         <ErrorState message={error} onRetry={loadInsights} />
       ) : (

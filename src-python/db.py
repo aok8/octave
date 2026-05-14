@@ -123,7 +123,7 @@ def get_cached_playlists(
 def upsert_track(conn: sqlite3.Connection, track: Dict[str, Any]) -> None:
     """Insert or replace a track row.
 
-    artist_names is stored as a JSON array string.
+    artist_names, artist_ids, and genres are stored as JSON array strings.
     """
     import json
 
@@ -133,25 +133,49 @@ def upsert_track(conn: sqlite3.Connection, track: Dict[str, Any]) -> None:
     else:
         artist_names_str = artist_names  # already serialised
 
+    artist_ids = track.get("artist_ids", [])
+    if isinstance(artist_ids, list):
+        artist_ids_str = json.dumps(artist_ids)
+    else:
+        artist_ids_str = artist_ids  # already serialised
+
+    genres = track.get("genres", [])
+    if isinstance(genres, list):
+        genres_str = json.dumps(genres)
+    else:
+        genres_str = genres  # already serialised
+
     conn.execute(
         """
         INSERT OR REPLACE INTO tracks
-            (id, name, artist_names, album_name, album_art_url,
+            (id, name, artist_names, artist_ids, genres, album_name, album_art_url,
              duration_ms, popularity, cached_at)
         VALUES
-            (:id, :name, :artist_names, :album_name, :album_art_url,
+            (:id, :name, :artist_names, :artist_ids, :genres, :album_name, :album_art_url,
              :duration_ms, :popularity, :cached_at)
         """,
         {
             "id": track["id"],
             "name": track["name"],
             "artist_names": artist_names_str,
+            "artist_ids": artist_ids_str,
+            "genres": genres_str,
             "album_name": track.get("album_name"),
             "album_art_url": track.get("album_art_url"),
             "duration_ms": track.get("duration_ms"),
             "popularity": track.get("popularity"),
             "cached_at": track.get("cached_at", int(time.time())),
         },
+    )
+    conn.commit()
+
+
+def update_track_genres(conn: sqlite3.Connection, track_id: str, genres: list) -> None:
+    """Update the genres JSON for a cached track (called after artist batch-fetch)."""
+    import json
+    conn.execute(
+        "UPDATE tracks SET genres = ? WHERE id = ?",
+        (json.dumps(genres), track_id),
     )
     conn.commit()
 

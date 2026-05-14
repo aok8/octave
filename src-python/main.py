@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers import playlists, tracks, search, insights, refine, export
+from routers.playlists import root_router as playlists_root_router
 from routers.storage import router as storage_router
 from routers.auth import router as auth_router
 import uvicorn
@@ -26,6 +27,7 @@ app.include_router(refine.router, prefix="/refine", tags=["refine"])
 app.include_router(export.router, prefix="/export", tags=["export"])
 app.include_router(storage_router, prefix="/storage", tags=["storage"])
 app.include_router(auth_router, prefix="/auth", tags=["auth"])
+app.include_router(playlists_root_router, tags=["playlists"])
 
 
 @app.get("/health")

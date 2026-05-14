@@ -206,6 +206,30 @@ def test_playlist_tracks_upserts_to_db(client: TestClient, tmp_db: str, mocker):
         pytest.skip(f"Endpoint not implemented yet (status {response.status_code})")
 
 
+def test_recently_used_returns_list(client: TestClient, tmp_db: str):
+    """GET /recently-used returns a list (may be empty or populated)."""
+    # Seed a user + playlist + recently_used entry
+    conn = sqlite3.connect(tmp_db)
+    conn.execute(
+        "INSERT OR IGNORE INTO users(id, display_name, email) VALUES ('u1', 'Test', 't@t.com')"
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO playlists(id, user_id, name, track_count) "
+        "VALUES ('pl1', 'u1', 'Test PL', 5)"
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO recently_used(playlist_id, accessed_at) "
+        "VALUES ('pl1', unixepoch('now'))"
+    )
+    conn.commit()
+    conn.close()
+
+    resp = client.get("/recently-used")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+
+
 @resp_mock.activate
 def test_playlists_401_bad_token(client: TestClient):
     """Pass invalid token; assert 401 response."""

@@ -23,6 +23,7 @@ from db import (
     get_cached_playlists,
     get_cached_tracks,
     get_db,
+    get_recently_used,
     log_interaction,
     update_recently_used,
     upsert_playlist,
@@ -33,6 +34,9 @@ from db import (
 from spotify_client import get_client
 
 router = APIRouter()
+
+# Root-level router for endpoints that live outside the /playlists prefix.
+root_router = APIRouter()
 
 _STALE_THRESHOLD_SECONDS = 300  # 5 minutes
 
@@ -287,5 +291,21 @@ def get_playlist_tracks(
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Failed to fetch tracks: {exc}")
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Root-level recently-used route (served at GET /recently-used)
+# ---------------------------------------------------------------------------
+
+
+@root_router.get("/recently-used")
+def recently_used():
+    """Return the 6 most recently opened playlists."""
+    conn = get_db()
+    try:
+        rows = get_recently_used(conn, limit=6)
+        return rows
     finally:
         conn.close()

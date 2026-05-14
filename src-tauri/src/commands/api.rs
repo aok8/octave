@@ -261,6 +261,38 @@ pub async fn import_db(path: String, mode: String) -> Result<serde_json::Value, 
     check_response(res).await
 }
 
+/// Full logout: clears OS keychain tokens + notifies the Python sidecar.
+///
+/// Keychain deletion is authoritative; the sidecar call is best-effort
+/// (ignored if the sidecar is not running).
+#[tauri::command]
+pub async fn logout() -> Result<(), String> {
+    // 1. Clear keychain tokens
+    crate::auth::clear_tokens()?;
+    // 2. Best-effort sidecar notification (ignore errors — sidecar may not be running)
+    let client = Client::new();
+    let _ = client
+        .post(format!("{}/auth/logout", sidecar_base()))
+        .send()
+        .await;
+    Ok(())
+}
+
+/// Fetches recently-used playlists from the sidecar cache.
+///
+/// Proxies to `GET /recently-used` on the Python sidecar.
+#[tauri::command]
+pub async fn get_recently_used() -> Result<Value, String> {
+    let client = Client::new();
+    let url = format!("{}/recently-used", sidecar_base());
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach sidecar: {e}"))?;
+    check_response(resp).await
+}
+
 /// Export a Spotify playlist (create new or overwrite existing).
 ///
 /// Routes based on `payload["mode"]`:

@@ -103,4 +103,16 @@ describe("Settings screen", () => {
     expect(section).toHaveTextContent("0.5.0");
     expect(section).toHaveTextContent("MIT");
   });
+
+  // ── Accessibility ─────────────────────────────────────────────────────────
+
+  it("account section has region role", () => {
+    render(<Settings />);
+    expect(screen.getByTestId("settings-account-section")).toHaveAttribute("role", "region");
+  });
+
+  it("account section has aria-label", () => {
+    render(<Settings />);
+    expect(screen.getByTestId("settings-account-section")).toHaveAttribute("aria-label", "Spotify Account");
+  });
 });

@@ -147,6 +147,7 @@ export function AppShell({ children, activeNav: controlledNav, onNavChange }: Ap
       <div style={{ display: "flex", flex: 1, overflow: "hidden" }}>
         {/* Sidebar */}
         <nav
+          aria-label="Main navigation"
           style={{
             width: 220,
             minWidth: 220,

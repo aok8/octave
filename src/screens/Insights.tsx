@@ -116,6 +116,7 @@ export function Insights({ playlistId, onBack }: InsightsProps) {
 
   return (
     <div
+      role="main"
       style={{
         padding: 32,
         background: "#121212",

@@ -41,4 +41,9 @@ describe("AIPrompt screen", () => {
     expect(btn).toBeInTheDocument();
     expect(btn).toBeDisabled();
   });
+
+  it("textarea has aria-label", () => {
+    render(<AIPrompt />);
+    expect(screen.getByTestId("ai-prompt-input")).toHaveAttribute("aria-label", "AI prompt input");
+  });
 });

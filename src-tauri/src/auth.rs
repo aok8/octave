@@ -16,6 +16,9 @@ const REDIRECT_URI: &str = "octave://callback";
 pub struct OAuthState {
     pub code_verifier: Mutex<Option<String>>,
     pub oauth_state: Mutex<Option<String>>,
+    /// Spotify app client ID — stored during start_oauth so the deep-link
+    /// callback handler can exchange the code without another frontend round-trip.
+    pub client_id: Mutex<Option<String>>,
 }
 
 impl OAuthState {
@@ -23,6 +26,7 @@ impl OAuthState {
         Self {
             code_verifier: Mutex::new(None),
             oauth_state: Mutex::new(None),
+            client_id: Mutex::new(None),
         }
     }
 }
@@ -61,7 +65,7 @@ pub fn start_oauth(
     rand::thread_rng().fill_bytes(&mut state_bytes);
     let state = URL_SAFE_NO_PAD.encode(state_bytes);
 
-    // Store verifier and state
+    // Store verifier, state, and client_id for the deep-link callback handler
     {
         let mut v = oauth_state.code_verifier.lock().map_err(|e| e.to_string())?;
         *v = Some(code_verifier);
@@ -69,6 +73,10 @@ pub fn start_oauth(
     {
         let mut s = oauth_state.oauth_state.lock().map_err(|e| e.to_string())?;
         *s = Some(state.clone());
+    }
+    {
+        let mut id = oauth_state.client_id.lock().map_err(|e| e.to_string())?;
+        *id = Some(client_id.to_string());
     }
 
     let auth_url = format!(
@@ -91,7 +99,6 @@ pub fn start_oauth(
 }
 
 /// Exchanges the authorization code for access + refresh tokens, storing them in the OS keychain.
-#[allow(dead_code)]
 pub async fn handle_callback(
     code: &str,
     client_id: &str,

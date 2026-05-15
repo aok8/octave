@@ -19,6 +19,12 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
+// listen() must be mocked so the event-listener setup in handleConnect does
+// not throw in jsdom. It resolves with a no-op unlisten function.
+vi.mock("@tauri-apps/api/event", () => ({
+  listen: vi.fn().mockResolvedValue(() => {}),
+}));
+
 const mockInvoke = vi.mocked(invoke);
 
 beforeEach(() => {

@@ -1,0 +1,93 @@
+name: Release
+
+# Triggered by pushing a version tag: git tag v1.0.0 && git push --tags
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release-windows:
+    name: Build & release (Windows x64)
+    runs-on: windows-latest
+
+    steps:
+      # ── Checkout ─────────────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+
+      # ── Python sidecar binary ─────────────────────────────────────────────────
+      # The binary is not committed (see src-python/.gitignore).
+      # We build it here with PyInstaller, then place it where Tauri expects it.
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install Python dependencies
+        run: pip install -r src-python/requirements.txt
+        shell: pwsh
+
+      - name: Install PyInstaller
+        run: pip install pyinstaller
+        shell: pwsh
+
+      - name: Build sidecar binary
+        run: |
+          cd src-python
+          python -m PyInstaller --onefile --name main main.py
+          Copy-Item "dist\main.exe" "main-x86_64-pc-windows-msvc.exe"
+        shell: pwsh
+
+      # ── Node / frontend ───────────────────────────────────────────────────────
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      # ── Rust ──────────────────────────────────────────────────────────────────
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      # ── Tauri build + GitHub Release ──────────────────────────────────────────
+      # tauri-action builds the app, signs update artifacts, creates a GitHub
+      # Release (draft), and uploads:
+      #   • Octave_x.y.z_x64-setup.exe          — NSIS installer
+      #   • Octave_x.y.z_x64-setup.nsis.zip     — signed update bundle
+      #   • Octave_x.y.z_x64-setup.nsis.zip.sig — detached signature
+      #   • latest.json                          — updater manifest (all platforms)
+      #
+      # Required GitHub secrets:
+      #   TAURI_SIGNING_PRIVATE_KEY  — content of ~/.tauri/octave.key
+      #   VITE_SPOTIFY_CLIENT_ID     — Spotify app client ID
+      - name: Build and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ""
+          VITE_SPOTIFY_CLIENT_ID: ${{ secrets.VITE_SPOTIFY_CLIENT_ID }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: "Octave ${{ github.ref_name }}"
+          releaseBody: |
+            ## What's new
+            See commit history for details.
+
+            ## Installation
+            Download **Octave_*_x64-setup.exe** and run it.
+
+            > Octave requires Windows 10+ with WebView2 (pre-installed on Windows 11).
+          releaseDraft: true
+          prerelease: false
+          updaterJsonPreferNsis: true
+          updaterJsonKeepUniversal: false

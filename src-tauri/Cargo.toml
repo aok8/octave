@@ -38,6 +38,10 @@ sqlx = { version = "0.8", features = ["sqlite", "runtime-tokio-native-tls", "mig
 anyhow = "1"
 urlencoding = "2"
 
+[dev-dependencies]
+wiremock = "0.6"
+tokio = { version = "1", features = ["full"] }
+
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]

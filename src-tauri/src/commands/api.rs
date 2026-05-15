@@ -319,3 +319,232 @@ pub async fn export_playlist(payload: Value) -> Result<Value, String> {
         .map_err(|e| e.to_string())?;
     check_response(resp).await
 }
+
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::Mutex;
+    use wiremock::matchers::{method, path};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
+
+    // Serialise env-var writes: OCTAVE_SIDECAR_PORT is process-global.
+    static PORT_LOCK: Mutex<()> = Mutex::new(());
+
+    /// Point `sidecar_base()` at the wiremock server for the duration of the
+    /// closure, then restore the previous value.
+    async fn with_mock_server<F, Fut>(f: F)
+    where
+        F: FnOnce(MockServer) -> Fut,
+        Fut: std::future::Future<Output = ()>,
+    {
+        let server = MockServer::start().await;
+        let port = server.address().port().to_string();
+        let _lock = PORT_LOCK.lock().unwrap();
+        let prev = std::env::var("OCTAVE_SIDECAR_PORT").ok();
+        std::env::set_var("OCTAVE_SIDECAR_PORT", &port);
+        f(server).await;
+        match prev {
+            Some(p) => std::env::set_var("OCTAVE_SIDECAR_PORT", p),
+            None => std::env::remove_var("OCTAVE_SIDECAR_PORT"),
+        }
+    }
+
+    // --- check_response -------------------------------------------------------
+
+    #[tokio::test]
+    async fn check_response_ok_returns_json() {
+        with_mock_server(|server| async move {
+            Mock::given(method("GET"))
+                .and(path("/ping"))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .set_body_json(serde_json::json!({"ok": true})),
+                )
+                .mount(&server)
+                .await;
+
+            let resp = reqwest::Client::new()
+                .get(format!("{}/ping", sidecar_base()))
+                .send()
+                .await
+                .unwrap();
+            let val = check_response(resp).await.unwrap();
+            assert_eq!(val["ok"], true);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn check_response_non2xx_returns_err() {
+        with_mock_server(|server| async move {
+            Mock::given(method("GET"))
+                .and(path("/bad"))
+                .respond_with(ResponseTemplate::new(503).set_body_string("down"))
+                .mount(&server)
+                .await;
+
+            let resp = reqwest::Client::new()
+                .get(format!("{}/bad", sidecar_base()))
+                .send()
+                .await
+                .unwrap();
+            let err = check_response(resp).await.unwrap_err();
+            assert!(err.contains("503"), "expected 503 in error: {err}");
+        })
+        .await;
+    }
+
+    // --- fetch_playlists -------------------------------------------------------
+
+    #[tokio::test]
+    async fn fetch_playlists_returns_parsed_list() {
+        with_mock_server(|server| async move {
+            Mock::given(method("GET"))
+                .and(path("/playlists"))
+                .respond_with(
+                    ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                        {"id": "p1", "name": "Chill Mix"}
+                    ])),
+                )
+                .mount(&server)
+                .await;
+
+            let result = fetch_playlists("tok".into(), false).await.unwrap();
+            assert_eq!(result[0]["name"], "Chill Mix");
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn fetch_playlists_propagates_sidecar_error() {
+        with_mock_server(|server| async move {
+            Mock::given(method("GET"))
+                .and(path("/playlists"))
+                .respond_with(ResponseTemplate::new(401).set_body_string("Unauthorized"))
+                .mount(&server)
+                .await;
+
+            let err = fetch_playlists("bad_tok".into(), false).await.unwrap_err();
+            assert!(err.contains("401"));
+        })
+        .await;
+    }
+
+    // --- fetch_audio_features --------------------------------------------------
+
+    #[tokio::test]
+    async fn fetch_audio_features_empty_ids_returns_err() {
+        // No mock needed — the guard fires before any HTTP call.
+        let err = fetch_audio_features(vec![], "tok".into()).await.unwrap_err();
+        assert!(err.contains("empty"), "expected 'empty' in: {err}");
+    }
+
+    #[tokio::test]
+    async fn fetch_audio_features_returns_features() {
+        with_mock_server(|server| async move {
+            Mock::given(method("GET"))
+                .and(path("/tracks/audio-features"))
+                .respond_with(
+                    ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                        {"id": "t1", "energy": 0.8, "tempo": 120.0}
+                    ])),
+                )
+                .mount(&server)
+                .await;
+
+            let result = fetch_audio_features(vec!["t1".into()], "tok".into())
+                .await
+                .unwrap();
+            assert_eq!(result[0]["energy"], 0.8);
+        })
+        .await;
+    }
+
+    // --- search_tracks --------------------------------------------------------
+
+    #[tokio::test]
+    async fn search_tracks_forwards_query() {
+        with_mock_server(|server| async move {
+            Mock::given(method("GET"))
+                .and(path("/search/tracks"))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .set_body_json(serde_json::json!([{"id": "s1", "name": "Found"}])),
+                )
+                .mount(&server)
+                .await;
+
+            let result = search_tracks("lofi".into(), "tok".into()).await.unwrap();
+            assert_eq!(result[0]["name"], "Found");
+        })
+        .await;
+    }
+
+    // --- sidecar_logout -------------------------------------------------------
+
+    #[tokio::test]
+    async fn sidecar_logout_calls_auth_endpoint() {
+        with_mock_server(|server| async move {
+            Mock::given(method("POST"))
+                .and(path("/auth/logout"))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .set_body_json(serde_json::json!({"ok": true})),
+                )
+                .mount(&server)
+                .await;
+
+            let result = sidecar_logout().await.unwrap();
+            assert_eq!(result["ok"], true);
+        })
+        .await;
+    }
+
+    // --- get_recently_used ----------------------------------------------------
+
+    #[tokio::test]
+    async fn get_recently_used_returns_list() {
+        with_mock_server(|server| async move {
+            Mock::given(method("GET"))
+                .and(path("/recently-used"))
+                .respond_with(
+                    ResponseTemplate::new(200)
+                        .set_body_json(serde_json::json!([{"id": "p1"}])),
+                )
+                .mount(&server)
+                .await;
+
+            let result = get_recently_used().await.unwrap();
+            assert_eq!(result[0]["id"], "p1");
+        })
+        .await;
+    }
+
+    // --- refine_playlist -------------------------------------------------------
+
+    #[tokio::test]
+    async fn refine_playlist_posts_payload_and_parses_result() {
+        with_mock_server(|server| async move {
+            Mock::given(method("POST"))
+                .and(path("/refine"))
+                .respond_with(
+                    ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                        "orderedTrackIds": ["t2", "t1"],
+                        "removedTrackIds": []
+                    })),
+                )
+                .mount(&server)
+                .await;
+
+            let payload =
+                serde_json::json!({"playlist_id": "p1", "track_ids": ["t1", "t2"]});
+            let result = refine_playlist(payload).await.unwrap();
+            assert_eq!(result["orderedTrackIds"][0], "t2");
+        })
+        .await;
+    }
+}

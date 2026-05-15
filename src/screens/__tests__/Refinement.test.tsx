@@ -54,6 +54,7 @@ const MOCK_TRACK_IDS = Array.from({ length: 12 }, (_, i) =>
   `tr_${String(i + 1).padStart(2, "0")}`
 );
 
+const GENRE_BUCKETS = ["Neo-Soul", "Hip-Hop", "Chill Pop", "Lo-Fi", "Nu-Jazz", "R&B"];
 const MOCK_TRACKS = MOCK_TRACK_IDS.map((id, i) => ({
   id,
   name: `Track ${i + 1}`,
@@ -61,6 +62,7 @@ const MOCK_TRACKS = MOCK_TRACK_IDS.map((id, i) => ({
   albumName: `Album ${i + 1}`,
   durationMs: 200000,
   popularity: 50,
+  genreBucket: GENRE_BUCKETS[i % GENRE_BUCKETS.length],
 }));
 
 // ── Setup / teardown ─────────────────────────────────────────────────────────

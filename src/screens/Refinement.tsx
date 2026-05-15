@@ -7,7 +7,6 @@ import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
 import { DonutChart } from "../charts/DonutChart";
 import type { DonutDataPoint } from "../charts/DonutChart";
-import { mockGenres } from "../mocks";
 import type { Playlist } from "../types";
 import type { Track, AudioFeatures } from "../types";
 
@@ -23,15 +22,10 @@ const GENRE_PALETTE: Record<string, string> = {
   Other: "#555555",
 };
 
-// Map internal GenreBucket keys → display labels used in GENRE_PALETTE
-const GENRE_BUCKET_TO_LABEL: Record<string, string> = {
-  rnb: "R&B",
-  neosoul: "Neo-Soul",
-  hiphop: "Hip-Hop",
-  chillpop: "Chill Pop",
-  lofi: "Lo-Fi",
-  nujazz: "Nu-Jazz",
-  other: "Other",
+// Normalize the Python sidecar's genre bucket names to GENRE_PALETTE keys.
+// Python returns display names; the only mismatch is "RnB" → "R&B".
+const PYTHON_BUCKET_NORMALIZE: Record<string, string> = {
+  RnB: "R&B",
 };
 
 // ── Refinement state ──────────────────────────────────────────────────────────
@@ -133,6 +127,7 @@ function median(values: number[]): number {
 
 function buildGenreData(
   trackIds: string[],
+  trackMap: Record<string, Track>,
   excluded: string[],
   boosted: string[]
 ): DonutDataPoint[] {
@@ -142,9 +137,10 @@ function buildGenreData(
   }
 
   for (const tid of trackIds) {
-    const buckets = mockGenres[tid] ?? [];
-    for (const bucket of buckets) {
-      const label = GENRE_BUCKET_TO_LABEL[bucket] ?? "Other";
+    const rawBucket = trackMap[tid]?.genreBucket;
+    if (rawBucket) {
+      // Normalize Python display name → GENRE_PALETTE key (only "RnB" differs)
+      const label = PYTHON_BUCKET_NORMALIZE[rawBucket] ?? rawBucket;
       if (counts[label] !== undefined) counts[label]++;
     }
   }
@@ -792,6 +788,7 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
 
   const genreData = buildGenreData(
     originalTrackIds,
+    trackMap,
     state.genreConfig.exclude,
     state.genreConfig.boost
   );

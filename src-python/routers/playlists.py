@@ -19,6 +19,7 @@ from typing import Optional
 import spotipy
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
 
+from genre import classify_genre
 from db import (
     get_cached_playlists,
     get_cached_tracks,
@@ -130,6 +131,21 @@ def _response_track(row: dict) -> dict:
             artist_names = json.loads(artist_names)
         except (json.JSONDecodeError, TypeError):
             artist_names = [artist_names] if artist_names else []
+
+    # Parse stored genres and classify into an Octave genre bucket.
+    # genres may be a JSON string (from DB) or already a list (in-memory).
+    genres_raw = row.get("genres")
+    if isinstance(genres_raw, str):
+        try:
+            genres_list = json.loads(genres_raw)
+        except (json.JSONDecodeError, TypeError):
+            genres_list = []
+    elif isinstance(genres_raw, list):
+        genres_list = list(genres_raw)
+    else:
+        genres_list = []
+    genre_bucket: str | None = classify_genre(genres_list) if genres_list else None
+
     return {
         "id": row["id"],
         "name": row["name"],
@@ -138,6 +154,7 @@ def _response_track(row: dict) -> dict:
         "album_art_url": row.get("album_art_url"),
         "duration_ms": row.get("duration_ms"),
         "popularity": row.get("popularity"),
+        "genre_bucket": genre_bucket,
     }
 
 
@@ -292,6 +309,10 @@ def get_playlist_tracks(
                     all_artist_ids.append(aid)
                 artist_to_tracks.setdefault(aid, []).append(row["id"])
 
+        # genres_map keeps in-memory genres so _response_track can classify
+        # without a second DB round-trip for freshly-fetched tracks.
+        genres_map: dict[str, list[str]] = {}
+
         # Fetch in batches of 50 (Spotify API limit)
         for i in range(0, len(all_artist_ids), 50):
             batch = all_artist_ids[i : i + 50]
@@ -305,8 +326,19 @@ def get_playlist_tracks(
                     if aid and genres:
                         for tid in artist_to_tracks.get(aid, []):
                             update_track_genres(conn, tid, genres)
+                            # Accumulate for in-memory classification
+                            existing = genres_map.get(tid, [])
+                            for g in genres:
+                                if g not in existing:
+                                    existing.append(g)
+                            genres_map[tid] = existing
             except Exception:
                 pass  # Genre enrichment is best-effort; never block track delivery
+
+        # Attach genres to in-memory rows so _response_track can classify them
+        for row in tracks_out:
+            if row["id"] in genres_map:
+                row["genres"] = genres_map[row["id"]]
 
         update_recently_used(conn, playlist_id)
         return [_response_track(row) for row in tracks_out]

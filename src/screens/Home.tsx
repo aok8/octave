@@ -5,6 +5,7 @@ import { PlaylistCard } from "../components/PlaylistCard";
 import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
 import type { Playlist } from "../types";
+import { normalizePlaylist } from "../lib/normalize";
 
 // ── Taglines ──────────────────────────────────────────────────────────────────
 
@@ -84,9 +85,9 @@ export function Home({ onNavigate }: HomeProps) {
     let cancelled = false;
     setRecentLoading(true);
     setRecentError(null);
-    invoke<Playlist[]>("get_recently_used")
+    invoke<unknown[]>("get_recently_used")
       .then((data) => {
-        if (!cancelled) setRecentPlaylists(data);
+        if (!cancelled) setRecentPlaylists(data.map(normalizePlaylist));
       })
       .catch(() => {
         if (!cancelled) {

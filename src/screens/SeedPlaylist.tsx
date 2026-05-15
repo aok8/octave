@@ -5,6 +5,7 @@ import { TrackCard } from "../components/TrackCard";
 import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
 import type { Playlist, Track } from "../types";
+import { normalizePlaylist, normalizeTrack } from "../lib/normalize";
 
 // ── SeedPlaylist screen ───────────────────────────────────────────────────────
 
@@ -50,9 +51,10 @@ export function SeedPlaylist({ onBack, onAnalyze }: SeedPlaylistProps) {
     setLoading(true);
     setError(null);
     try {
-      const data = await invoke<Playlist[]>("fetch_playlists");
-      setPlaylists(data);
-      setFilteredPlaylists(data);
+      const data = await invoke<unknown[]>("fetch_playlists");
+      const normalized = data.map(normalizePlaylist);
+      setPlaylists(normalized);
+      setFilteredPlaylists(normalized);
     } catch (err) {
       setError("Could not load playlists. Check your connection and try again.");
     } finally {
@@ -66,10 +68,10 @@ export function SeedPlaylist({ onBack, onAnalyze }: SeedPlaylistProps) {
     setTracksError(null);
     setTracks([]);
     try {
-      const data = await invoke<Track[]>("fetch_playlist_tracks", {
+      const data = await invoke<unknown[]>("fetch_playlist_tracks", {
         playlistId: playlist.id,
       });
-      setTracks(data);
+      setTracks(data.map(normalizeTrack));
     } catch (err) {
       setTracksError("Could not load tracks for this playlist.");
     } finally {

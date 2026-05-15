@@ -195,6 +195,19 @@ pub struct AuthStateInfo {
     pub user_id: Option<String>,
 }
 
+/// Returns the stored Spotify access token from the OS keychain.
+///
+/// In test environments the `OCTAVE_TEST_TOKEN` env var is used as a
+/// fallback so that wiremock-based unit tests do not require a real keychain.
+pub fn get_stored_token() -> Result<String, String> {
+    if let Ok(tok) = std::env::var("OCTAVE_TEST_TOKEN") {
+        if !tok.is_empty() {
+            return Ok(tok);
+        }
+    }
+    retrieve_token(ACCESS_TOKEN_KEY)
+}
+
 /// Returns the current authentication state.
 pub fn get_auth_state() -> AuthStateInfo {
     match retrieve_token(ACCESS_TOKEN_KEY) {

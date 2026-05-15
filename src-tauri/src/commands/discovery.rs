@@ -1,7 +1,8 @@
 /// discovery.rs — Tauri IPC proxy commands for the Discovery Mode endpoints.
 ///
 /// Proxies POST requests to the Python FastAPI sidecar's /discovery/* routes.
-/// Follows the same pattern as commands/api.rs.
+/// The Spotify access token is fetched from the OS keychain automatically —
+/// callers do not supply it.
 
 use reqwest::Client;
 use serde_json::Value;
@@ -33,14 +34,12 @@ async fn check_response(resp: reqwest::Response) -> Result<Value, String> {
 ///
 /// Proxies to `POST /discovery/start` on the Python sidecar.
 #[tauri::command]
-pub async fn start_discovery_session(
-    access_token: String,
-    seed_track_id: String,
-) -> Result<Value, String> {
+pub async fn start_discovery_session(seed_track_id: String) -> Result<Value, String> {
+    let token = crate::auth::get_stored_token()?;
     let url = format!("{}/discovery/start", sidecar_base());
     let client = Client::new();
     let body = serde_json::json!({
-        "access_token": access_token,
+        "access_token": token,
         "seed_track_id": seed_track_id,
     });
     let resp = client
@@ -58,15 +57,15 @@ pub async fn start_discovery_session(
 /// `action` must be `"keep"` or `"skip"`.
 #[tauri::command]
 pub async fn send_discovery_feedback(
-    access_token: String,
     session_id: String,
     track_id: String,
     action: String,
 ) -> Result<Value, String> {
+    let token = crate::auth::get_stored_token()?;
     let url = format!("{}/discovery/feedback", sidecar_base());
     let client = Client::new();
     let body = serde_json::json!({
-        "access_token": access_token,
+        "access_token": token,
         "session_id": session_id,
         "track_id": track_id,
         "action": action,
@@ -84,14 +83,12 @@ pub async fn send_discovery_feedback(
 ///
 /// Proxies to `POST /discovery/end` on the Python sidecar.
 #[tauri::command]
-pub async fn end_discovery_session(
-    access_token: String,
-    session_id: String,
-) -> Result<Value, String> {
+pub async fn end_discovery_session(session_id: String) -> Result<Value, String> {
+    let token = crate::auth::get_stored_token()?;
     let url = format!("{}/discovery/end", sidecar_base());
     let client = Client::new();
     let body = serde_json::json!({
-        "access_token": access_token,
+        "access_token": token,
         "session_id": session_id,
     });
     let resp = client
@@ -108,14 +105,14 @@ pub async fn end_discovery_session(
 /// Proxies to `POST /export/new` on the Python sidecar with the given track IDs.
 #[tauri::command]
 pub async fn start_discovery_export(
-    access_token: String,
     track_ids: Vec<String>,
     name: String,
 ) -> Result<Value, String> {
+    let token = crate::auth::get_stored_token()?;
     let url = format!("{}/export/new", sidecar_base());
     let client = Client::new();
     let body = serde_json::json!({
-        "token": access_token,
+        "token": token,
         "track_ids": track_ids,
         "name": name,
         "description": "Created by Octave Discovery Mode",

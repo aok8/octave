@@ -6,10 +6,10 @@
  * This file exposes a standalone page-level component for routing purposes.
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ErrorState } from "../components/ErrorState";
-import { mockPlaylists } from "../mocks";
+import type { Playlist } from "../types";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -32,22 +32,27 @@ export function Export({
   onClose,
   onSuccess,
 }: ExportProps) {
-  const playlist = mockPlaylists.find((p) => p.id === playlistId);
-  const defaultName = playlist ? `${playlist.name} — Refined` : "My Playlist — Refined";
-
-  const [name, setName] = useState(defaultName);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState("");
+  const [name, setName] = useState("My Playlist — Refined");
   const [description, setDescription] = useState("");
   const [mode, setMode] = useState<"new" | "overwrite">("new");
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState(
-    mockPlaylists[0]?.id ?? ""
-  );
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  useEffect(() => {
+    invoke<Playlist[]>("fetch_playlists").then((data) => {
+      const safe = Array.isArray(data) ? data : [];
+      setPlaylists(safe);
+      setSelectedPlaylistId(safe[0]?.id ?? "");
+      const found = safe.find((p) => p.id === playlistId);
+      if (found) setName(`${found.name} — Refined`);
+    }).catch(() => {});
+  }, [playlistId]);
+
   async function handleExport() {
-    // Validation
     if (!name.trim()) {
       setNameError("Playlist name cannot be empty.");
       return;
@@ -67,11 +72,13 @@ export function Export({
 
     try {
       await invoke("export_playlist", {
-        mode,
-        playlistId: mode === "overwrite" ? selectedPlaylistId : undefined,
-        name: name.trim(),
-        description: description.trim(),
-        trackIds,
+        payload: {
+          mode,
+          playlist_id: mode === "overwrite" ? selectedPlaylistId : undefined,
+          name: name.trim(),
+          description: description.trim(),
+          track_ids: trackIds,
+        },
       });
       setSuccess(true);
       onSuccess?.();
@@ -318,7 +325,7 @@ export function Export({
                   cursor: "pointer",
                 }}
               >
-                {mockPlaylists.map((pl) => (
+                {playlists.map((pl) => (
                   <option
                     key={pl.id}
                     value={pl.id}

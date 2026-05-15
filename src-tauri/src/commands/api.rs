@@ -38,18 +38,16 @@ pub(super) async fn check_response(resp: reqwest::Response) -> Result<Value, Str
 /// Fetch the current user's playlists.
 ///
 /// `force_refresh = true` bypasses the SQLite cache and fetches fresh data
-/// from Spotify.
+/// from Spotify. Omit or pass `null` for the default (cached) behaviour.
 #[tauri::command]
-pub async fn fetch_playlists(
-    access_token: String,
-    force_refresh: bool,
-) -> Result<Value, String> {
+pub async fn fetch_playlists(force_refresh: Option<bool>) -> Result<Value, String> {
+    let token = crate::auth::get_stored_token()?;
     let client = Client::new();
     let url = format!(
         "{}/playlists?access_token={}&force_refresh={}",
         sidecar_base(),
-        urlencoding::encode(&access_token),
-        force_refresh,
+        urlencoding::encode(&token),
+        force_refresh.unwrap_or(false),
     );
     let resp = client
         .get(&url)
@@ -65,16 +63,16 @@ pub async fn fetch_playlists(
 #[tauri::command]
 pub async fn fetch_playlist_tracks(
     playlist_id: String,
-    access_token: String,
-    force_refresh: bool,
+    force_refresh: Option<bool>,
 ) -> Result<Value, String> {
+    let token = crate::auth::get_stored_token()?;
     let client = Client::new();
     let url = format!(
         "{}/playlists/{}/tracks?access_token={}&force_refresh={}",
         sidecar_base(),
         urlencoding::encode(&playlist_id),
-        urlencoding::encode(&access_token),
-        force_refresh,
+        urlencoding::encode(&token),
+        force_refresh.unwrap_or(false),
     );
     let resp = client
         .get(&url)
@@ -88,20 +86,18 @@ pub async fn fetch_playlist_tracks(
 ///
 /// Missing / uncached IDs are batch-fetched from Spotify (100 per call).
 #[tauri::command]
-pub async fn fetch_audio_features(
-    track_ids: Vec<String>,
-    access_token: String,
-) -> Result<Value, String> {
+pub async fn fetch_audio_features(track_ids: Vec<String>) -> Result<Value, String> {
     if track_ids.is_empty() {
         return Err("track_ids must not be empty".to_string());
     }
+    let token = crate::auth::get_stored_token()?;
     let ids_param = track_ids.join(",");
     let client = Client::new();
     let url = format!(
         "{}/tracks/audio-features?track_ids={}&access_token={}",
         sidecar_base(),
         urlencoding::encode(&ids_param),
-        urlencoding::encode(&access_token),
+        urlencoding::encode(&token),
     );
     let resp = client
         .get(&url)
@@ -115,16 +111,14 @@ pub async fn fetch_audio_features(
 ///
 /// Results are ephemeral — not cached in SQLite.
 #[tauri::command]
-pub async fn search_tracks(
-    query: String,
-    access_token: String,
-) -> Result<Value, String> {
+pub async fn search_tracks(query: String) -> Result<Value, String> {
+    let token = crate::auth::get_stored_token()?;
     let client = Client::new();
     let url = format!(
         "{}/search/tracks?q={}&access_token={}",
         sidecar_base(),
         urlencoding::encode(&query),
-        urlencoding::encode(&access_token),
+        urlencoding::encode(&token),
     );
     let resp = client
         .get(&url)
@@ -157,16 +151,14 @@ pub async fn fetch_insights(playlist_id: String) -> Result<Value, String> {
 ///
 /// Returned tracks are cached in the SQLite `tracks` table.
 #[tauri::command]
-pub async fn fetch_recommendations(
-    seed_track_id: String,
-    access_token: String,
-) -> Result<Value, String> {
+pub async fn fetch_recommendations(seed_track_id: String) -> Result<Value, String> {
+    let token = crate::auth::get_stored_token()?;
     let client = Client::new();
     let url = format!(
         "{}/search/recommendations?seed_track_id={}&access_token={}",
         sidecar_base(),
         urlencoding::encode(&seed_track_id),
-        urlencoding::encode(&access_token),
+        urlencoding::encode(&token),
     );
     let resp = client
         .get(&url)
@@ -299,10 +291,13 @@ pub async fn get_recently_used() -> Result<Value, String> {
 ///   - `"new"`       → `POST /export/new`
 ///   - `"overwrite"` → `POST /export/overwrite/{playlist_id}`
 ///
-/// For `"new"` the payload must include `{ name, description, track_ids, token }`.
-/// For `"overwrite"` the payload must include `{ playlist_id, track_ids, token }`.
+/// The Spotify access token is fetched from the OS keychain and injected
+/// automatically — callers do not supply it.
 #[tauri::command]
-pub async fn export_playlist(payload: Value) -> Result<Value, String> {
+pub async fn export_playlist(mut payload: Value) -> Result<Value, String> {
+    let token = crate::auth::get_stored_token()?;
+    // Inject token so the Python sidecar can call the Spotify API
+    payload["token"] = Value::String(token);
     let mode = payload["mode"].as_str().unwrap_or("new");
     let url = if mode == "overwrite" {
         let pid = payload["playlist_id"].as_str().unwrap_or("");
@@ -334,8 +329,8 @@ mod tests {
     // Serialise env-var writes: OCTAVE_SIDECAR_PORT is process-global.
     static PORT_LOCK: Mutex<()> = Mutex::new(());
 
-    /// Point `sidecar_base()` at the wiremock server for the duration of the
-    /// closure, then restore the previous value.
+    /// Point `sidecar_base()` at the wiremock server and inject a fake token
+    /// via `OCTAVE_TEST_TOKEN` for the duration of the closure.
     async fn with_mock_server<F, Fut>(f: F)
     where
         F: FnOnce(MockServer) -> Fut,
@@ -344,12 +339,18 @@ mod tests {
         let server = MockServer::start().await;
         let port = server.address().port().to_string();
         let _lock = PORT_LOCK.lock().unwrap();
-        let prev = std::env::var("OCTAVE_SIDECAR_PORT").ok();
+        let prev_port = std::env::var("OCTAVE_SIDECAR_PORT").ok();
+        let prev_tok = std::env::var("OCTAVE_TEST_TOKEN").ok();
         std::env::set_var("OCTAVE_SIDECAR_PORT", &port);
+        std::env::set_var("OCTAVE_TEST_TOKEN", "test_token");
         f(server).await;
-        match prev {
+        match prev_port {
             Some(p) => std::env::set_var("OCTAVE_SIDECAR_PORT", p),
             None => std::env::remove_var("OCTAVE_SIDECAR_PORT"),
+        }
+        match prev_tok {
+            Some(t) => std::env::set_var("OCTAVE_TEST_TOKEN", t),
+            None => std::env::remove_var("OCTAVE_TEST_TOKEN"),
         }
     }
 
@@ -413,7 +414,7 @@ mod tests {
                 .mount(&server)
                 .await;
 
-            let result = fetch_playlists("tok".into(), false).await.unwrap();
+            let result = fetch_playlists(None).await.unwrap();
             assert_eq!(result[0]["name"], "Chill Mix");
         })
         .await;
@@ -428,7 +429,7 @@ mod tests {
                 .mount(&server)
                 .await;
 
-            let err = fetch_playlists("bad_tok".into(), false).await.unwrap_err();
+            let err = fetch_playlists(None).await.unwrap_err();
             assert!(err.contains("401"));
         })
         .await;
@@ -439,7 +440,7 @@ mod tests {
     #[tokio::test]
     async fn fetch_audio_features_empty_ids_returns_err() {
         // No mock needed — the guard fires before any HTTP call.
-        let err = fetch_audio_features(vec![], "tok".into()).await.unwrap_err();
+        let err = fetch_audio_features(vec![]).await.unwrap_err();
         assert!(err.contains("empty"), "expected 'empty' in: {err}");
     }
 
@@ -456,7 +457,7 @@ mod tests {
                 .mount(&server)
                 .await;
 
-            let result = fetch_audio_features(vec!["t1".into()], "tok".into())
+            let result = fetch_audio_features(vec!["t1".into()])
                 .await
                 .unwrap();
             assert_eq!(result[0]["energy"], 0.8);
@@ -478,7 +479,7 @@ mod tests {
                 .mount(&server)
                 .await;
 
-            let result = search_tracks("lofi".into(), "tok".into()).await.unwrap();
+            let result = search_tracks("lofi".into()).await.unwrap();
             assert_eq!(result[0]["name"], "Found");
         })
         .await;

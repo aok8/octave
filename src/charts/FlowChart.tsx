@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import * as d3 from "d3";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ export function FlowChart({ data, width = 480, height = 200 }: FlowChartProps) {
     // Area generator
     const area = d3
       .area<d3.SeriesPoint<FlowDataPoint>>()
-      .x((d, i) => xScale(i))
+      .x((_d, i) => xScale(i))
       .y0((d) => yScale(d[0]))
       .y1((d) => yScale(d[1]))
       .curve(d3.curveCatmullRom.alpha(0.5));

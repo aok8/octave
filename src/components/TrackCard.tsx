@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import type { Track, AudioFeatures, GenreBucket } from "../types";
 import { GenreChip } from "./GenreChip";
 

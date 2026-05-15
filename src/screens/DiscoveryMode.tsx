@@ -5,7 +5,7 @@
  *   S8 — Discovery Mode: swipe cards, keyboard nav, queue drawer, export
  */
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingState } from "../components/LoadingState";

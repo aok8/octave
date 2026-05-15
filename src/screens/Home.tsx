@@ -5,7 +5,6 @@ import { PlaylistCard } from "../components/PlaylistCard";
 import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
 import type { Playlist } from "../types";
-import { mockPlaylists } from "../mocks";
 
 // ── Taglines ──────────────────────────────────────────────────────────────────
 

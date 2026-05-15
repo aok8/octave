@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { TrackCard } from "../components/TrackCard";
 import { LoadingState } from "../components/LoadingState";

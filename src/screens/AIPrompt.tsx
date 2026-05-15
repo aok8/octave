@@ -7,7 +7,7 @@
  *   S9 — On mount restore saved key via get_ai_status IPC
  */
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";

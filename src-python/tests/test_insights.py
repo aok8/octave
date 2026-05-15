@@ -154,7 +154,78 @@ def test_response_shape(client: TestClient, tmp_db: str):
         for key in ("genre", "count", "color", "subgenres"):
             assert key in entry, f"genre_breakdown entry missing key: {key}"
 
-    # Each timeline entry must have position, track_id, genre
+    # Each timeline entry must have position, track_id, genre, tempo, popularity, key
     for entry in data["timeline"]:
-        for key in ("position", "track_id", "genre"):
+        for key in ("position", "track_id", "genre", "tempo", "popularity", "key"):
             assert key in entry, f"timeline entry missing key: {key}"
+
+    # key_distribution must be present (may be empty if no features)
+    assert "key_distribution" in data, "Missing field: key_distribution"
+    assert isinstance(data["key_distribution"], dict)
+
+
+def test_advanced_insights_fields(client: TestClient, tmp_db: str):
+    """AC-S14-01 — timeline entries include tempo, popularity, key; key_distribution present."""
+    # Seed with distinct tempo/key values per track
+    conn = __import__("sqlite3").connect(tmp_db)
+    conn.execute("INSERT OR IGNORE INTO users (id, display_name) VALUES ('u1', 'Test')")
+    pid = "pl_adv_test"
+    conn.execute(
+        "INSERT OR IGNORE INTO playlists (id, user_id, name, track_count) VALUES (?, 'u1', 'Adv PL', 4)",
+        (pid,),
+    )
+    # key=0 (C major) and key=5 (F major) tracks — two distinct keys
+    tracks = [
+        {"tid": "adv_t0", "tempo": 110.0, "key": 0, "mode": 1, "pop": 60},
+        {"tid": "adv_t1", "tempo": 125.0, "key": 5, "mode": 1, "pop": 75},
+        {"tid": "adv_t2", "tempo": 90.0,  "key": 0, "mode": 0, "pop": 50},
+        {"tid": "adv_t3", "tempo": 140.0, "key": 5, "mode": 0, "pop": 80},
+    ]
+    for i, t in enumerate(tracks):
+        conn.execute(
+            "INSERT OR IGNORE INTO tracks (id, name, artist_names, popularity) VALUES (?, ?, '[]', ?)",
+            (t["tid"], f"Song {i}", t["pop"]),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)",
+            (pid, t["tid"], i),
+        )
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO audio_features
+                (track_id, energy, tempo, valence, danceability, acousticness,
+                 instrumentalness, speechiness, loudness, key, mode, time_signature)
+            VALUES (?, 0.5, ?, 0.5, 0.5, 0.1, 0.0, 0.05, -6.0, ?, ?, 4)
+            """,
+            (t["tid"], t["tempo"], t["key"], t["mode"]),
+        )
+    conn.commit()
+    conn.close()
+
+    resp = client.get(f"/insights/{pid}")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    # Tempo is returned per track
+    tempos = [e["tempo"] for e in data["timeline"]]
+    assert 110.0 in tempos
+    assert 140.0 in tempos
+
+    # Popularity is returned per track
+    pops = [e["popularity"] for e in data["timeline"]]
+    assert 60 in pops
+    assert 80 in pops
+
+    # key field maps pitch class to note name
+    keys = [e["key"] for e in data["timeline"]]
+    assert "C" in keys      # key=0, mode=1
+    assert "Cm" in keys     # key=0, mode=0
+    assert "F" in keys      # key=5, mode=1
+    assert "Fm" in keys     # key=5, mode=0
+
+    # key_distribution aggregates correctly — 2 tracks each in C/Cm and F/Fm
+    kd = data["key_distribution"]
+    assert kd.get("C") == 1
+    assert kd.get("Cm") == 1
+    assert kd.get("F") == 1
+    assert kd.get("Fm") == 1

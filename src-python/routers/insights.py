@@ -78,11 +78,15 @@ def get_insights(
         track_ids = [t["id"] for t in tracks]
         features_by_id = get_cached_features(conn, track_ids) if track_ids else {}
 
+        # Pitch class → note name (C major scale naming)
+        _KEY_NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"]
+
         # --- Build timeline + genre assignment ---
         timeline = []
         genre_counts: dict[str, int] = {}
         # subgenres: genre → set of subgenre strings (v1: empty since no artist data)
         genre_subgenres: dict[str, set] = {}
+        key_counts: dict[str, int] = {}
 
         for track in tracks:
             tid = track["id"]
@@ -105,6 +109,14 @@ def get_insights(
             genre_counts[genre] = genre_counts.get(genre, 0) + 1
             genre_subgenres.setdefault(genre, set())
 
+            # Key distribution — map pitch class int to note name
+            raw_key = feats.get("key")
+            key_name: str | None = None
+            if raw_key is not None and 0 <= int(raw_key) <= 11:
+                mode_suffix = "m" if feats.get("mode", 1) == 0 else ""
+                key_name = _KEY_NAMES[int(raw_key)] + mode_suffix
+                key_counts[key_name] = key_counts.get(key_name, 0) + 1
+
             timeline.append(
                 {
                     "position": pos,
@@ -112,6 +124,9 @@ def get_insights(
                     "energy": feats.get("energy"),
                     "valence": feats.get("valence"),
                     "danceability": feats.get("danceability"),
+                    "tempo": feats.get("tempo"),
+                    "popularity": track.get("popularity"),
+                    "key": key_name,
                     "genre": genre,
                 }
             )
@@ -136,11 +151,15 @@ def get_insights(
             payload={"playlist_id": playlist_id},
         )
 
+        # Sort key_distribution by note name for deterministic ordering
+        key_distribution = dict(sorted(key_counts.items()))
+
         return {
             "playlist_id": playlist_id,
             "genre_breakdown": genre_breakdown,
             "timeline": timeline,
             "total_tracks": total_tracks,
+            "key_distribution": key_distribution,
         }
 
     finally:

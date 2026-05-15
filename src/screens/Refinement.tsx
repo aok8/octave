@@ -7,11 +7,7 @@ import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
 import { DonutChart } from "../charts/DonutChart";
 import type { DonutDataPoint } from "../charts/DonutChart";
-import {
-  mockTracks,
-  mockAudioFeatures,
-  mockGenres,
-} from "../mocks";
+import { mockGenres } from "../mocks";
 import type { Playlist } from "../types";
 import type { Track, AudioFeatures } from "../types";
 
@@ -613,6 +609,7 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
   const [error, setError] = useState<string | null>(null);
   const [trackMap, setTrackMap] = useState<Record<string, Track>>({});
   const [originalTrackIds, setOriginalTrackIds] = useState<string[]>([]);
+  const [audioFeatures, setAudioFeatures] = useState<AudioFeatures[]>([]);
   const [showExport, setShowExport] = useState(false);
 
   // Debounce ref
@@ -629,25 +626,30 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
     setLoading(true);
     setError(null);
 
-    // Build track map from mock data (no new IPC for track metadata)
-    const map: Record<string, Track> = {};
-    for (const t of mockTracks) {
-      map[t.id] = t;
-    }
-    setTrackMap(map);
-
-    const ids = mockTracks.map((t) => t.id);
-    setOriginalTrackIds(ids);
-
     try {
+      // Load real tracks from Spotify via Tauri IPC
+      const tracks = await invoke<Track[]>("fetch_playlist_tracks", {
+        playlistId,
+      });
+
+      const map: Record<string, Track> = {};
+      for (const t of tracks) {
+        map[t.id] = t;
+      }
+      setTrackMap(map);
+
+      const ids = tracks.map((t) => t.id);
+      setOriginalTrackIds(ids);
+
+      // Fetch audio features — fall back to empty on failure so the UI still loads
       let features: AudioFeatures[] = [];
       try {
         features = await invoke<AudioFeatures[]>("fetch_audio_features", {
           trackIds: ids,
         });
+        setAudioFeatures(features);
       } catch {
-        // Fall back to mock data
-        features = mockAudioFeatures;
+        // Sidecar unavailable — sliders default to INITIAL_SLIDER_VALUES
       }
 
       // Compute median per feature to set slider defaults
@@ -658,7 +660,7 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
         energy: median(pick("energy")),
         tempo: median(pick("tempo")),
         popularity: median(
-          mockTracks
+          tracks
             .map((t) => t.popularity ?? 50)
             .filter((v) => typeof v === "number")
         ),
@@ -1128,7 +1130,7 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
               {displayTracks.map(({ id, delta }) => {
                 const track = trackMap[id];
                 if (!track) return null;
-                const features = mockAudioFeatures.find((f) => f.trackId === id);
+                const features = audioFeatures.find((f) => f.trackId === id);
                 return (
                   <motion.div
                     key={id}

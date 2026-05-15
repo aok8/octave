@@ -34,8 +34,11 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 | Sprint 12 | GET /health test, WCAG AA axe-core audit (9 screens, 0 violations), Cargo.lock | ✅ Done |
 | Sprint 13 | End-to-end IPC smoke tests: 10 Rust lib tests (wiremock), Python cross-endpoint integration test, CI upgrade to cargo test --lib | ✅ Done |
 | Sprint 14 | Advanced Insights (F-13): Tempo Map + Key Distribution charts, extended /insights API, fixed IPC type mismatch | ✅ Done |
+| Sprint 15 | App wiring: Insights → Refinement nav button, `.env.example`, Login screen + test suite (9 tests), accessibility Login audit | ✅ Done |
+| Sprint 16 | Token plumbing (keychain-only, removed `access_token` from all Rust commands), invoke payload fixes (`refine_playlist` / `export_playlist`), Export screen wired into App.tsx navigation, ExportModal + Export screen on live `fetch_playlists` IPC | ✅ Done |
+| Sprint 17 | Real data wiring: `search_tracks` arg fix (`q` → `query`), `start_discovery_export` name param, `end_discovery_session` lifecycle, Refinement loads real tracks via `fetch_playlist_tracks` | ✅ Done |
 
-**Test coverage**: 127 Python pytest · 131 Vitest (17 test files) — all passing on `master`.
+**Test coverage**: 141 Vitest (18 test files) — all passing on `master`.
 
 ## Features
 

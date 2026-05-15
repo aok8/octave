@@ -39,7 +39,7 @@ export function SeedSong({ onBack, onDiscover }: SeedSongProps) {
       setSearchLoading(true);
       setSearchError(null);
       try {
-        const data = await invoke<Track[]>("search_tracks", { q: query.trim() });
+        const data = await invoke<Track[]>("search_tracks", { query: query.trim() });
         setSearchResults(data);
       } catch {
         setSearchError("Search failed. Check your connection and try again.");

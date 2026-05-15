@@ -17,7 +17,7 @@ export interface Playlist {
 }
 
 export interface Track {
-  id: string;
+  id: string | null;
   name: string;
   artistNames: string[];
   albumName?: string;
@@ -26,6 +26,8 @@ export interface Track {
   popularity?: number;
   /** Octave genre bucket returned by the sidecar (e.g. "Neo-Soul", "Hip-Hop"). */
   genreBucket?: string;
+  /** True for local files added from the user's computer — no Spotify ID. */
+  isLocal?: boolean;
 }
 
 export interface AudioFeatures {

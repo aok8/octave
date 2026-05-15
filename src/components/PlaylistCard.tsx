@@ -111,17 +111,9 @@ export function PlaylistCard({ playlist, onClick }: PlaylistCardProps) {
             fontSize: 12,
             color: "rgba(255,255,255,0.60)",
             marginTop: 4,
-            display: "flex",
-            gap: 8,
           }}
         >
-          <span>{playlist.trackCount} tracks</span>
-          {playlist.cachedAt != null && (
-            <>
-              <span style={{ color: "rgba(255,255,255,0.25)" }}>·</span>
-              <span>{relativeTime(playlist.cachedAt)}</span>
-            </>
-          )}
+          {playlist.trackCount} tracks
         </div>
       </div>
     </motion.div>

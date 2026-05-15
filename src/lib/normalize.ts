@@ -20,7 +20,7 @@ export function normalizePlaylist(raw: any): Playlist {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function normalizeTrack(raw: any): Track {
   return {
-    id: raw.id as string,
+    id: (raw.id ?? null) as string | null,
     name: (raw.name ?? "") as string,
     artistNames: (raw.artistNames ?? raw.artist_names ?? []) as string[],
     albumName: (raw.albumName ?? raw.album_name) as string | undefined,
@@ -28,5 +28,6 @@ export function normalizeTrack(raw: any): Track {
     durationMs: (raw.durationMs ?? raw.duration_ms) as number | undefined,
     popularity: raw.popularity as number | undefined,
     genreBucket: (raw.genreBucket ?? raw.genre_bucket) as string | undefined,
+    isLocal: Boolean(raw.isLocal ?? raw.is_local),
   };
 }

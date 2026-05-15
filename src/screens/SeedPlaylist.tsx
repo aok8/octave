@@ -255,8 +255,8 @@ export function SeedPlaylist({ onBack, onAnalyze }: SeedPlaylistProps) {
             </p>
           ) : (
             <div>
-              {tracks.map((track) => (
-                <TrackCard key={track.id} track={track} />
+              {tracks.map((track, i) => (
+                <TrackCard key={track.id ?? `local-${i}`} track={track} />
               ))}
             </div>
           )}

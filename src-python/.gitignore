@@ -3,6 +3,14 @@ build/
 dist/
 *.spec
 
+# Compiled sidecar binaries — built by CI, never committed to git.
+# Run scripts/build-sidecar.ps1 (Windows) or scripts/build-sidecar.sh (Linux/macOS)
+# to produce the binary locally for tauri dev / tauri build.
+main-*.exe
+main-*-pc-windows-*
+main-*-unknown-linux-*
+main-*-apple-darwin
+
 # Python cache
 __pycache__/
 *.py[cod]

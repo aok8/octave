@@ -37,6 +37,7 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 | Sprint 15 | App wiring: Insights → Refinement nav button, `.env.example`, Login screen + test suite (9 tests), accessibility Login audit | ✅ Done |
 | Sprint 16 | Token plumbing (keychain-only, removed `access_token` from all Rust commands), invoke payload fixes (`refine_playlist` / `export_playlist`), Export screen wired into App.tsx navigation, ExportModal + Export screen on live `fetch_playlists` IPC | ✅ Done |
 | Sprint 17 | Real data wiring: `search_tracks` arg fix (`q` → `query`), `start_discovery_export` name param, `end_discovery_session` lifecycle, Refinement loads real tracks via `fetch_playlist_tracks` | ✅ Done |
+| Sprint 18 | Genre donut real data (sidecar returns `genre_bucket`, Refinement drops mockGenres), binary commit strategy (build in CI, never commit, `scripts/build-sidecar.ps1/.sh`) | ✅ Done |
 
 **Test coverage**: 141 Vitest (18 test files) — all passing on `master`.
 
@@ -70,9 +71,17 @@ npm install
 # Install Python sidecar deps
 pip install -r src-python/requirements.txt
 
+# Build the Python sidecar binary (required before tauri dev/build)
+# Windows:
+.\scripts\build-sidecar.ps1
+# Linux / macOS:
+./scripts/build-sidecar.sh
+
 # Run Tauri dev mode (launches frontend + Rust shell + Python sidecar)
 npm run tauri dev
 ```
+
+> **Note on the sidecar binary**: `src-python/main-*.exe` / `main-*-linux-*` are **not committed to git** (binary bloat, no delta compression). Build them locally with the scripts above, or let CI produce them during `tauri build` packaging. This follows the VS Code / ripgrep pattern: build per-platform in CI, download at install time.
 
 ### Python sidecar (standalone)
 

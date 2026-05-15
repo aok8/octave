@@ -24,6 +24,8 @@ export interface Track {
   albumArtUrl?: string;
   durationMs?: number;
   popularity?: number;
+  /** Octave genre bucket returned by the sidecar (e.g. "Neo-Soul", "Hip-Hop"). */
+  genreBucket?: string;
 }
 
 export interface AudioFeatures {

@@ -13,6 +13,17 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
+        // single-instance MUST be registered before deep-link so that when
+        // Spotify redirects to octave://callback, Windows routes the URL to
+        // the already-running process (which holds the PKCE state in memory)
+        // instead of launching a fresh second instance.
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            // Bring the existing window to the foreground
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(OAuthState::new())

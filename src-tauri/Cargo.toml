@@ -1,6 +1,6 @@
 [package]
 name = "octave"
-version = "0.1.0"
+version = "1.0.0"
 description = "Octave — playlist curator with fine-tuned control"
 authors = ["Alain Kouassi <aokouassi@gmail.com>"]
 license = "MIT"

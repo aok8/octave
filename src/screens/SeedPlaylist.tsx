@@ -10,9 +10,10 @@ import type { Playlist, Track } from "../types";
 
 interface SeedPlaylistProps {
   onBack?: () => void;
+  onAnalyze?: (playlistId: string) => void;
 }
 
-export function SeedPlaylist({ onBack }: SeedPlaylistProps) {
+export function SeedPlaylist({ onBack, onAnalyze }: SeedPlaylistProps) {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [filteredPlaylists, setFilteredPlaylists] = useState<Playlist[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -196,23 +197,44 @@ export function SeedPlaylist({ onBack }: SeedPlaylistProps) {
             <h2 style={{ fontSize: 16, fontWeight: 600, color: "#ffffff", margin: 0 }}>
               {selectedPlaylist.name}
             </h2>
-            <button
-              onClick={() => {
-                setSelectedPlaylist(null);
-                setTracks([]);
-              }}
-              style={{
-                background: "transparent",
-                border: "none",
-                color: "rgba(255,255,255,0.45)",
-                cursor: "pointer",
-                fontSize: 13,
-                fontFamily: "inherit",
-                padding: "4px 8px",
-              }}
-            >
-              Close
-            </button>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {onAnalyze && tracks.length > 0 && (
+                <button
+                  onClick={() => onAnalyze(selectedPlaylist.id)}
+                  aria-label={`Analyze ${selectedPlaylist.name}`}
+                  style={{
+                    background: "#1DB9FF",
+                    border: "none",
+                    borderRadius: 6,
+                    color: "#000",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    fontFamily: "inherit",
+                    padding: "6px 14px",
+                  }}
+                >
+                  Analyze Playlist →
+                </button>
+              )}
+              <button
+                onClick={() => {
+                  setSelectedPlaylist(null);
+                  setTracks([]);
+                }}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "rgba(255,255,255,0.45)",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontFamily: "inherit",
+                  padding: "4px 8px",
+                }}
+              >
+                Close
+              </button>
+            </div>
           </div>
 
           {tracksLoading ? (

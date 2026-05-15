@@ -84,6 +84,7 @@ afterEach(() => {
 // ── Screen imports ────────────────────────────────────────────────────────────
 
 import Home from "../Home";
+import { Login } from "../Login";
 import { SeedPlaylist } from "../SeedPlaylist";
 import { SeedSong } from "../SeedSong";
 import { Insights } from "../Insights";
@@ -104,6 +105,13 @@ async function renderAndAudit(ui: React.ReactElement) {
 // ── Tests (sequential — axe-core is a singleton) ──────────────────────────────
 
 describe.sequential("WCAG AA accessibility audit", () => {
+  it("Login screen has no violations", async () => {
+    vi.stubEnv("VITE_SPOTIFY_CLIENT_ID", "test_client_id");
+    const results = await renderAndAudit(<Login onAuthenticated={() => {}} />);
+    vi.unstubAllEnvs();
+    expect(results).toHaveNoViolations();
+  }, 10000);
+
   it("Home screen has no violations", async () => {
     const results = await renderAndAudit(<Home />);
     expect(results).toHaveNoViolations();

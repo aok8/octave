@@ -43,6 +43,7 @@ interface InsightsResponse {
 interface InsightsProps {
   playlistId: string;
   onBack?: () => void;
+  onRefine?: () => void;
 }
 
 const SECTION_LABEL: React.CSSProperties = {
@@ -65,7 +66,7 @@ const EMPTY_CARD: React.CSSProperties = {
   borderRadius: 8,
 };
 
-export function Insights({ playlistId, onBack }: InsightsProps) {
+export function Insights({ playlistId, onBack, onRefine }: InsightsProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [insights, setInsights] = useState<InsightsResponse | null>(null);
@@ -134,41 +135,62 @@ export function Insights({ playlistId, onBack }: InsightsProps) {
       }}
     >
       {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-        {onBack && (
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {onBack && (
+            <button
+              onClick={onBack}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "rgba(255,255,255,0.55)",
+                cursor: "pointer",
+                padding: "4px 8px",
+                fontSize: 18,
+                fontFamily: "inherit",
+                borderRadius: 6,
+              }}
+              aria-label="Go back"
+            >
+              ←
+            </button>
+          )}
+          <div>
+            <h1
+              style={{
+                fontSize: 22,
+                fontWeight: 700,
+                color: "#ffffff",
+                margin: 0,
+                letterSpacing: "-0.3px",
+              }}
+            >
+              Playlist Insights
+            </h1>
+            <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: "4px 0 0" }}>
+              Audio DNA of your playlist
+            </p>
+          </div>
+        </div>
+        {onRefine && (
           <button
-            onClick={onBack}
+            onClick={onRefine}
+            aria-label="Refine playlist"
             style={{
-              background: "transparent",
+              background: "#1DB9FF",
               border: "none",
-              color: "rgba(255,255,255,0.55)",
-              cursor: "pointer",
-              padding: "4px 8px",
-              fontSize: 18,
-              fontFamily: "inherit",
               borderRadius: 6,
+              color: "#000",
+              cursor: "pointer",
+              fontSize: 13,
+              fontWeight: 600,
+              fontFamily: "inherit",
+              padding: "8px 16px",
             }}
-            aria-label="Go back"
           >
-            ←
+            Refine Playlist →
           </button>
         )}
-        <div>
-          <h1
-            style={{
-              fontSize: 22,
-              fontWeight: 700,
-              color: "#ffffff",
-              margin: 0,
-              letterSpacing: "-0.3px",
-            }}
-          >
-            Playlist Insights
-          </h1>
-          <p style={{ fontSize: 13, color: "rgba(255,255,255,0.45)", margin: "4px 0 0" }}>
-            Audio DNA of your playlist
-          </p>
-        </div>
       </div>
 
       {/* ── Content ─────────────────────────────────────────────────────────── */}

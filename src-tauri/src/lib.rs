@@ -5,6 +5,10 @@ mod db;
 use auth::OAuthState;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
+use tauri_plugin_shell::ShellExt;
+
+// Keeps the sidecar child process alive for the lifetime of the app.
+struct SidecarHandle(std::sync::Mutex<Option<tauri_plugin_shell::process::CommandChild>>);
 
 // ── OAuth URL handler ─────────────────────────────────────────────────────────
 //
@@ -130,6 +134,44 @@ pub fn run() {
                     log::error!("DB init failed: {e}");
                 }
             });
+
+            // Spawn the Python FastAPI sidecar. externalBin bundles it but
+            // doesn't auto-start it — we must spawn explicitly.
+            let sidecar_port: u16 = 8765; // avoid collisions with common dev servers
+            std::env::set_var("OCTAVE_SIDECAR_PORT", sidecar_port.to_string());
+
+            match app.shell().sidecar("main") {
+                Ok(cmd) => {
+                    match cmd.args([sidecar_port.to_string()]).spawn() {
+                        Ok((mut rx, child)) => {
+                            log::info!("Sidecar started on port {sidecar_port}");
+                            // Store handle so the process stays alive until the app exits
+                            app.manage(SidecarHandle(std::sync::Mutex::new(Some(child))));
+                            // Drain sidecar stdout/stderr so the pipe buffer never fills
+                            tauri::async_runtime::spawn(async move {
+                                use tauri_plugin_shell::process::CommandEvent;
+                                while let Some(event) = rx.recv().await {
+                                    match event {
+                                        CommandEvent::Stdout(b) => {
+                                            log::debug!("sidecar: {}", String::from_utf8_lossy(&b));
+                                        }
+                                        CommandEvent::Stderr(b) => {
+                                            log::warn!("sidecar stderr: {}", String::from_utf8_lossy(&b));
+                                        }
+                                        CommandEvent::Terminated(s) => {
+                                            log::info!("sidecar terminated: {s:?}");
+                                            break;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            });
+                        }
+                        Err(e) => log::error!("Failed to spawn sidecar: {e}"),
+                    }
+                }
+                Err(e) => log::error!("Failed to create sidecar command: {e}"),
+            }
 
             // on_open_url fires when the app itself is launched with a deep-link
             // URL (e.g. first run, or macOS which always routes to running app).

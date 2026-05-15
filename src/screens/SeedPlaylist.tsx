@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { PlaylistCard } from "../components/PlaylistCard";
 import { TrackCard } from "../components/TrackCard";
@@ -25,6 +25,7 @@ export function SeedPlaylist({ onBack, onAnalyze }: SeedPlaylistProps) {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [tracksLoading, setTracksLoading] = useState(false);
   const [tracksError, setTracksError] = useState<string | null>(null);
+  const trackPanelRef = useRef<HTMLDivElement>(null);
 
   // Fetch playlists on mount
   useEffect(() => {
@@ -64,6 +65,8 @@ export function SeedPlaylist({ onBack, onAnalyze }: SeedPlaylistProps) {
 
   async function handlePlaylistClick(playlist: Playlist) {
     setSelectedPlaylist(playlist);
+    // Scroll after React paints the panel (next tick)
+    setTimeout(() => trackPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     setTracksLoading(true);
     setTracksError(null);
     setTracks([]);
@@ -187,7 +190,7 @@ export function SeedPlaylist({ onBack, onAnalyze }: SeedPlaylistProps) {
 
       {/* ── Track list for selected playlist ─────────────────────────────── */}
       {selectedPlaylist && (
-        <div style={{ marginTop: 32 }}>
+        <div ref={trackPanelRef} style={{ marginTop: 32 }}>
           <div
             style={{
               display: "flex",

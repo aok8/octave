@@ -22,7 +22,8 @@ function gradientForId(id: string): string {
 // ── Timestamp formatter ───────────────────────────────────────────────────────
 
 function relativeTime(ts: number): string {
-  const diffMs = Date.now() - ts;
+  // ts is Unix seconds from the sidecar; Date.now() is ms
+  const diffMs = Date.now() - ts * 1000;
   const diffDays = Math.floor(diffMs / 86_400_000);
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Yesterday";

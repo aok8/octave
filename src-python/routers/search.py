@@ -77,7 +77,7 @@ def search_tracks(
 
     try:
         sp = get_client(access_token)
-        result = sp.search(q=q, type="track", limit=limit)
+        result = sp.search(q=q, type="track", limit=limit, additional_types=("track",))
     except spotipy.SpotifyException as exc:
         status = exc.http_status if hasattr(exc, "http_status") else 500
         if status == 401:

@@ -1,153 +1,119 @@
 # Octave
 
-A dark-themed desktop music playlist curator with fine-tuned control over playlist creation.
+**Find your flow.**
 
-> *Find your flow.*
+Octave is a desktop app that gives you fine-tuned control over your Spotify playlists. Pull in any playlist, dial in the exact energy and mood you want using audio feature sliders, filter or boost genres, and export a refined playlist back to Spotify — all in a few clicks.
 
-Octave lets you build playlists from seed tracks or existing playlists, visualize your music through interactive genre/mood insights, refine recommendations using audio feature sliders, and export directly to Spotify.
+![Octave screenshot](docs/screenshot.png)
 
-## Tech Stack
+---
 
-| Layer | Technology |
+## What Octave does
+
+| Feature | What it means |
 |---|---|
-| Desktop shell | [Tauri v2](https://tauri.app) (Rust + WebView2) |
-| Frontend | React 18 + TypeScript + Vite + TailwindCSS v3 + Framer Motion + D3.js |
-| Python sidecar | FastAPI + Spotipy + SQLite |
-| Auth | Spotify OAuth PKCE — tokens stored in OS keychain |
-| AI (V2) | OpenRouter + Ollama (local) |
+| **Playlist Refinement** | Adjust 7 sliders (energy, tempo, valence, danceability, acousticness, instrumentalness, popularity) to filter and re-rank any of your Spotify playlists |
+| **Genre Control** | An interactive genre donut shows your playlist's genre mix. Left-click a genre to exclude it; right-click to boost it |
+| **Seed Song Discovery** | Search any track, get recommendations in its orbit, then launch a swipe-card discovery session to keep or skip tracks one at a time |
+| **Discovery Mode** | Swipe through recommended tracks (← skip / → keep), build a queue, and export what you love to a new Spotify playlist |
+| **AI Playlist Generation** | Describe the vibe you want in plain language ("late night study session, no lyrics") and Octave generates a playlist using OpenRouter or a local Ollama model |
+| **Insights** | Visual breakdowns of your playlist — genre donut, mood/energy flow over time, tempo map, and key distribution |
+| **Export to Spotify** | Save any refined or generated playlist as a new Spotify playlist, or overwrite an existing one |
 
-## Project Status
+---
 
-| Sprint | Focus | Status |
-|---|---|---|
-| Sprint 1 | Tauri scaffold, Spotify auth (PKCE), SQLite schema, Python sidecar | ✅ Done |
-| Sprint 2 | Playlist/track/audio-features pipeline, SQLite cache, UI component library | ✅ Done |
-| Sprint 3 | Home screen, Seed flows, D3 Insights charts (donut + stacked area) | ✅ Done |
-| Sprint 4 | Refinement screen (7 sliders + genre filter/boost), Export to Spotify | ✅ Done |
-| Sprint 5 | Settings, AI Prompt placeholder, storage/auth endpoints | ✅ Done |
-| Sprint 6 | Accessibility pass, Home IPC wiring, Inter font, packaging config, logout | ✅ Done |
-| Sprint 7 | (previous sprint work) | ✅ Done |
-| Sprint 8 | Discovery Mode (swipe cards, keyboard nav, queue drawer, export), Settings AI status | ✅ Done |
-| Sprint 9 | AI Playlist Generation (OpenRouter + Ollama), Discovery seed wiring (R-11) | ✅ Done |
-| Sprint 10 | Fix deprecated Spotify endpoints (audio features fallback, artist-search recommendations) | ✅ Done |
-| Sprint 11 | CI Rust check, Inter font bundling, MIT LICENSE, NSIS path fix | ✅ Done |
-| Sprint 12 | GET /health test, WCAG AA axe-core audit (9 screens, 0 violations), Cargo.lock | ✅ Done |
-| Sprint 13 | End-to-end IPC smoke tests: 10 Rust lib tests (wiremock), Python cross-endpoint integration test, CI upgrade to cargo test --lib | ✅ Done |
-| Sprint 14 | Advanced Insights (F-13): Tempo Map + Key Distribution charts, extended /insights API, fixed IPC type mismatch | ✅ Done |
-| Sprint 15 | App wiring: Insights → Refinement nav button, `.env.example`, Login screen + test suite (9 tests), accessibility Login audit | ✅ Done |
-| Sprint 16 | Token plumbing (keychain-only, removed `access_token` from all Rust commands), invoke payload fixes (`refine_playlist` / `export_playlist`), Export screen wired into App.tsx navigation, ExportModal + Export screen on live `fetch_playlists` IPC | ✅ Done |
-| Sprint 17 | Real data wiring: `search_tracks` arg fix (`q` → `query`), `start_discovery_export` name param, `end_discovery_session` lifecycle, Refinement loads real tracks via `fetch_playlist_tracks` | ✅ Done |
-| Sprint 18 | Genre donut real data (sidecar returns `genre_bucket`, Refinement drops mockGenres), binary commit strategy (build in CI, never commit, `scripts/build-sidecar.ps1/.sh`) | ✅ Done |
+## Requirements
 
-**Test coverage**: 141 Vitest (18 test files) — all passing on `master`.
+- Windows 10 or 11 (WebView2 is pre-installed on Windows 11; Windows 10 may prompt to install it)
+- A Spotify account (free or premium)
 
-## Features
+---
 
-- **Seed Playlist** — browse your Spotify library, select a playlist, view full tracklist
-- **Seed Song** — search Spotify catalog, pick a track, get AI-powered recommendations
-- **Insights** — interactive D3 donut chart (genre breakdown) + stacked area chart (mood/energy flow)
-- **Refinement** — 7 audio-feature sliders (energy, tempo, valence, danceability, acousticness, instrumentalness, popularity), genre filter/boost via donut clicks, live track preview with position deltas; graceful fallback to mid-range values when Spotify's deprecated audio-features endpoint is unavailable
-- **Export** — save refined playlist to Spotify as a new playlist or overwrite an existing one
-- **Settings** — Spotify account info, logout (keychain clear), database export/import, app version
-- **Discovery Mode** — swipe-card discovery session: keep (→) or skip (←) tracks one at a time, keyboard shortcuts, queue drawer, export kept tracks to Spotify
-- **AI Playlist Generation** — natural language prompt → Spotify track search → export; OpenRouter API or local Ollama
-- **Accessibility** — `aria-label`, `role="region"` / `role="main"` across all screens, labelled nav
+## Installation
 
-## Getting Started
+1. Go to [**Releases**](https://github.com/aok8/octave/releases/latest)
+2. Download **`Octave_x.x.x_x64-setup.exe`**
+3. Run the installer — Octave installs per-machine and creates a Start Menu shortcut
+4. Launch **Octave** from the Start Menu
 
-### Prerequisites
+Octave checks for updates automatically on launch and will prompt you when a new version is available.
 
-- [Rust](https://rustup.rs/) (stable)
-- [Node.js](https://nodejs.org/) 20+
-- Python 3.11+
-- [Tauri CLI v2](https://tauri.app/start/prerequisites/)
+---
 
-### Development
+## Getting started
 
-```bash
-# Install frontend deps
-npm install
+### 1. Connect your Spotify account
 
-# Install Python sidecar deps
-pip install -r src-python/requirements.txt
+On first launch, click **Connect Spotify**. Octave opens a browser window for Spotify's OAuth login. Sign in, grant access, and you'll be returned to the app automatically.
 
-# Build the Python sidecar binary (required before tauri dev/build)
-# Windows:
-.\scripts\build-sidecar.ps1
-# Linux / macOS:
-./scripts/build-sidecar.sh
+Your access token is stored securely in the Windows credential store — Octave never sees your Spotify password.
 
-# Run Tauri dev mode (launches frontend + Rust shell + Python sidecar)
-npm run tauri dev
-```
+### 2. Refine a playlist
 
-> **Note on the sidecar binary**: `src-python/main-*.exe` / `main-*-linux-*` are **not committed to git** (binary bloat, no delta compression). Build them locally with the scripts above, or let CI produce them during `tauri build` packaging. This follows the VS Code / ripgrep pattern: build per-platform in CI, download at install time.
+- Click **Seed Playlist** on the Home screen
+- Browse or search your Spotify library and select a playlist
+- Click **Refine** to open the Refinement screen
+- Use the **sliders** on the left to dial in the audio profile you want
+- Use the **genre donut** in the centre to exclude or boost genres (left-click = exclude, right-click = boost)
+- Watch the track list on the right update live
+- Hit **Export to Spotify** when you're happy
 
-### Python sidecar (standalone)
+### 3. Discover from a seed track
 
-```bash
-cd src-python
-python main.py        # starts FastAPI on port 8000
-```
+- Click **Seed Song** on the Home screen
+- Search for any track and select it
+- Scroll down to see recommendations, then click **Discover from this track**
+- In Discovery Mode, press → or click the right button to keep a track, ← or the left button to skip
+- When you've gone through the session, export your kept tracks to Spotify
 
-### Tests
+### 4. Generate a playlist with AI
 
-```bash
-# Python sidecar tests (125 tests)
-cd src-python
-python -m pytest tests/ -v
+- Click **AI Playlist** on the Home screen (or navigate via the sidebar)
+- On first use, enter an OpenRouter API key — or click **Use Local Model** if you have Ollama running locally
+- Type a description of what you want (up to 500 characters)
+- Click **Generate** — Octave searches Spotify for each suggestion and builds a playable playlist
+- Export to Spotify when done
 
-# Frontend component + screen tests (110 tests)
-npx vitest run
-```
+### 5. View Insights
 
-## Architecture
+- From any playlist view, click **View Insights**
+- See the genre breakdown, mood/energy flow, tempo map, and key distribution for that playlist
+- Click **Refine Playlist →** to jump straight into refinement
 
-```
-┌─────────────────────────────────────────┐
-│  Tauri Shell (Rust)                     │
-│  • Spotify OAuth PKCE                   │
-│  • OS keychain (token storage)          │
-│  • SQLite migrations (sqlx)             │
-│  • Python sidecar lifecycle             │
-│  • IPC commands → Python sidecar        │
-└────────────┬────────────────────────────┘
-             │ IPC (Tauri invoke)
-┌────────────▼────────────────────────────┐
-│  React Frontend (TypeScript/Vite)       │
-│  • Home, SeedPlaylist, SeedSong         │
-│  • Insights (D3 donut + area charts)    │
-│  • Refinement (sliders + genre donut)   │
-│  • Export modal                         │
-│  • Discovery Mode (swipe cards)         │
-│  • AI Playlist Generation               │
-│  • Settings, Framer Motion transitions  │
-└────────────┬────────────────────────────┘
-             │ HTTP (localhost:8000)
-┌────────────▼────────────────────────────┐
-│  Python Sidecar (FastAPI)               │
-│  • GET  /playlists          (SWR cache) │
-│  • GET  /playlists/{id}/tracks          │
-│  • GET  /tracks/audio-features          │
-│  • GET  /search/tracks                  │
-│  • GET  /search/recommendations         │
-│  • GET  /insights/{playlist_id}         │
-│  • POST /refine                         │
-│  • POST /export/new                     │
-│  • POST /export/overwrite/{id}          │
-│  • POST /auth/logout                    │
-│  • GET  /auth/profile                   │
-│  • POST /storage/export                 │
-│  • POST /storage/import                 │
-│  • POST /discovery/start                │
-│  • POST /discovery/feedback             │
-│  • POST /discovery/end                  │
-│  • POST /ai/generate                    │
-│  • POST /ai/key · GET /ai/status        │
-│  • SQLite read/write (shared DB)        │
-└─────────────────────────────────────────┘
-```
+---
+
+## Keyboard shortcuts
+
+| Key | Action |
+|---|---|
+| `→` | Keep track (Discovery Mode) |
+| `←` | Skip track (Discovery Mode) |
+
+---
+
+## AI setup (optional)
+
+Octave supports two AI backends for playlist generation:
+
+**OpenRouter** (cloud, recommended)
+1. Sign up at [openrouter.ai](https://openrouter.ai) and create a free API key
+2. In Octave → AI Playlist, paste your key and click **Save Key**
+
+**Ollama** (local, no account needed)
+1. Install [Ollama](https://ollama.ai) and pull a model (`ollama pull llama3`)
+2. Make sure Ollama is running (`ollama serve`)
+3. Click **Use Local Model** in Octave — no key required
+
+---
+
+## Privacy
+
+- Octave communicates only with Spotify's API (for music data) and your chosen AI provider (if you use playlist generation)
+- Your Spotify token is stored in the Windows credential store, never on disk in plain text
+- No usage data is collected or transmitted
+
+---
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE)

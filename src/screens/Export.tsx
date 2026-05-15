@@ -6,7 +6,7 @@
  * This file exposes a standalone page-level component for routing purposes.
  */
 
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ErrorState } from "../components/ErrorState";
 import type { Playlist } from "../types";

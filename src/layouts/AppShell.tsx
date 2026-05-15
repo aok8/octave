@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { PageTransition } from "./PageTransition";
 
 // ── Nav item definition ──────────────────────────────────────────────────────
 
@@ -144,8 +143,7 @@ export function AppShell({ children, activeNav: controlledNav, onNavChange }: Ap
           display: "flex",
           alignItems: "center",
           userSelect: "none",
-          WebkitAppRegion: "drag" as React.CSSProperties["WebkitAppRegion"],
-          flexShrink: 0,
+flexShrink: 0,
         }}
       >
         <TrafficLights />

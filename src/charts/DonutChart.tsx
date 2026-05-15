@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState } from "react";
 import * as d3 from "d3";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ export function DonutChart({
       .attr("fill", (d) => d.data.color)
       .attr("opacity", 0.85)
       .attr("data-genre", (d) => d.data.genre)
-      .attr("data-testid", (d, i) => `donut-arc-${i}`)
+      .attr("data-testid", (_d, i) => `donut-arc-${i}`)
       .style("cursor", onSegmentClick ? "pointer" : "default")
       .style("transition", "opacity 150ms ease")
       .on("mouseenter", function (event, d) {
@@ -129,7 +129,7 @@ export function DonutChart({
           y: event.clientY - rect.top - 8,
         }));
       })
-      .on("mouseleave", function (event, d) {
+      .on("mouseleave", function (_event, _d) {
         d3.select(this)
           .transition()
           .duration(150)
@@ -137,7 +137,7 @@ export function DonutChart({
           .attr("opacity", 0.85);
         setTooltip((prev) => ({ ...prev, visible: false }));
       })
-      .on("click", function (event, d) {
+      .on("click", function (_event, d) {
         onSegmentClick?.(d.data.genre);
       });
 

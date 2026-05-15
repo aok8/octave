@@ -7,6 +7,7 @@ import { SeedPlaylist } from "./screens/SeedPlaylist";
 import { SeedSong } from "./screens/SeedSong";
 import { Insights } from "./screens/Insights";
 import { Refinement } from "./screens/Refinement";
+import { Export } from "./screens/Export";
 import { Settings } from "./screens/Settings";
 import { AIPrompt } from "./screens/AIPrompt";
 import { DiscoveryMode } from "./screens/DiscoveryMode";
@@ -21,6 +22,7 @@ type Screen =
   | { id: "seed-song" }
   | { id: "insights"; playlistId: string }
   | { id: "refinement"; playlistId: string }
+  | { id: "export"; trackIds: string[]; playlistId: string }
   | { id: "ai-prompt" }
   | { id: "discover"; seedTrackId?: string }
   | { id: "settings" };
@@ -33,6 +35,7 @@ function navIdForScreen(screen: Screen): NavId {
     case "seed-playlist":
     case "insights":
     case "refinement":
+    case "export":
       return "library";
     case "seed-song":
       return "create";
@@ -150,6 +153,19 @@ export default function App() {
           <Refinement
             playlistId={screen.playlistId}
             onBack={() => setScreen({ id: "insights", playlistId: screen.playlistId })}
+            onExport={(trackIds) =>
+              setScreen({ id: "export", trackIds, playlistId: screen.playlistId })
+            }
+          />
+        );
+
+      case "export":
+        return (
+          <Export
+            trackIds={screen.trackIds}
+            playlistId={screen.playlistId}
+            onClose={() => setScreen({ id: "refinement", playlistId: screen.playlistId })}
+            onSuccess={() => setScreen({ id: "home" })}
           />
         );
 

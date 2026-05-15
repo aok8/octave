@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useReducer, useRef, useCallback } from "react";
+import React, { useState, useEffect, useReducer, useRef, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { AnimatePresence, motion } from "framer-motion";
 import { AudioFeatureSlider } from "../components/AudioFeatureSlider";
@@ -11,8 +11,8 @@ import {
   mockTracks,
   mockAudioFeatures,
   mockGenres,
-  mockPlaylists,
 } from "../mocks";
+import type { Playlist } from "../types";
 import type { Track, AudioFeatures } from "../types";
 
 // ── Genre palette ─────────────────────────────────────────────────────────────
@@ -227,27 +227,52 @@ interface ExportModalProps {
 }
 
 function ExportModal({ trackIds, playlistId, onClose }: ExportModalProps) {
-  const playlist = mockPlaylists.find((p) => p.id === playlistId);
-  const defaultName = playlist ? `${playlist.name} — Refined` : "My Playlist — Refined";
-
-  const [name, setName] = useState(defaultName);
-  const [description, setDescription] = useState("");
-  const [mode, setMode] = useState<"new" | "overwrite">("new");
-  const [selectedPlaylistId, setSelectedPlaylistId] = useState(
-    mockPlaylists[0]?.id ?? ""
-  );
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState("");
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [nameError, setNameError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [mode, setMode] = useState<"new" | "overwrite">("new");
+
+  // Fetch user's playlists for the overwrite dropdown and for the default name
+  useEffect(() => {
+    invoke<Playlist[]>("fetch_playlists").then((data) => {
+      const safe = Array.isArray(data) ? data : [];
+      setPlaylists(safe);
+      setSelectedPlaylistId(safe[0]?.id ?? "");
+    }).catch(() => {
+      // non-fatal — overwrite mode will just have no options
+    });
+  }, []);
+
+  const sourcePlaylist = useMemo(
+    () => playlists.find((p) => p.id === playlistId),
+    [playlists, playlistId]
+  );
+  const defaultName = sourcePlaylist
+    ? `${sourcePlaylist.name} — Refined`
+    : "My Playlist — Refined";
+
+  const [name, setName] = useState("");
+  // Update name once we know the playlist name
+  useEffect(() => {
+    if (sourcePlaylist && !name) setName(defaultName);
+  }, [defaultName, sourcePlaylist]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Set initial name synchronously on first render
+  const nameRef = useRef(false);
+  if (!nameRef.current) {
+    nameRef.current = true;
+  }
+  const [description, setDescription] = useState("");
 
   async function handleExport() {
-    // Validation
-    if (!name.trim()) {
+    const exportName = name || defaultName;
+    if (!exportName.trim()) {
       setNameError("Playlist name cannot be empty.");
       return;
     }
-    if (name.length > 100) {
+    if (exportName.length > 100) {
       setNameError("Playlist name must be 100 characters or fewer.");
       return;
     }
@@ -261,11 +286,13 @@ function ExportModal({ trackIds, playlistId, onClose }: ExportModalProps) {
 
     try {
       await invoke("export_playlist", {
-        mode,
-        playlistId: mode === "overwrite" ? selectedPlaylistId : undefined,
-        name: name.trim(),
-        description: description.trim(),
-        trackIds,
+        payload: {
+          mode,
+          playlist_id: mode === "overwrite" ? selectedPlaylistId : undefined,
+          name: exportName.trim(),
+          description: description.trim(),
+          track_ids: trackIds,
+        },
       });
       setSuccess(true);
       setTimeout(() => onClose(), 1500);
@@ -384,12 +411,13 @@ function ExportModal({ trackIds, playlistId, onClose }: ExportModalProps) {
                 id="export-playlist-name"
                 data-testid="export-name-input"
                 type="text"
-                value={name}
+                value={name || defaultName}
                 maxLength={100}
                 onChange={(e) => {
                   setName(e.target.value);
                   if (nameError) setNameError(null);
                 }}
+                placeholder={defaultName}
                 style={{
                   background: "rgba(255,255,255,0.06)",
                   border: `1px solid ${nameError ? "#FF5757" : "rgba(255,255,255,0.12)"}`,
@@ -474,7 +502,7 @@ function ExportModal({ trackIds, playlistId, onClose }: ExportModalProps) {
                     cursor: "pointer",
                   }}
                 >
-                  {mockPlaylists.map((pl) => (
+                  {playlists.map((pl) => (
                     <option key={pl.id} value={pl.id} style={{ background: "#1a1a1a" }}>
                       {pl.name}
                     </option>
@@ -557,6 +585,7 @@ function SpinnerIcon() {
 interface RefinementProps {
   playlistId?: string;
   onBack?: () => void;
+  onExport?: (trackIds: string[]) => void;
 }
 
 const INITIAL_SLIDER_VALUES: SliderValues = {
@@ -578,7 +607,7 @@ const INITIAL_STATE: RefinementState = {
   isRefining: false,
 };
 
-export function Refinement({ playlistId = "pl_01", onBack }: RefinementProps) {
+export function Refinement({ playlistId = "pl_01", onBack, onExport }: RefinementProps) {
   const [state, dispatch] = useReducer(refinementReducer, INITIAL_STATE);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -688,11 +717,14 @@ export function Refinement({ playlistId = "pl_01", onBack }: RefinementProps) {
         orderedTrackIds: string[];
         removedTrackIds: string[];
       }>("refine_playlist", {
-        trackIds,
-        constraints,
-        genreConfig: {
-          exclude: genreConfig.exclude,
-          boost: genreConfig.boost,
+        payload: {
+          playlist_id: playlistId,
+          track_ids: trackIds,
+          constraints,
+          genre_config: {
+            exclude: genreConfig.exclude,
+            boost: genreConfig.boost,
+          },
         },
       });
       dispatch({
@@ -777,9 +809,6 @@ export function Refinement({ playlistId = "pl_01", onBack }: RefinementProps) {
       return { id, delta };
     });
 
-  // Playlist name for export
-  const playlist = mockPlaylists.find((p) => p.id === playlistId);
-
   // Inject spinner keyframes once
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -843,9 +872,9 @@ export function Refinement({ playlistId = "pl_01", onBack }: RefinementProps) {
           >
             Refine Playlist
           </h1>
-          {playlist && (
+          {playlistId && (
             <p style={{ fontSize: 12, color: "rgba(255,255,255,0.40)", margin: "3px 0 0" }}>
-              {playlist.name}
+              {playlistId}
             </p>
           )}
         </div>
@@ -1155,7 +1184,11 @@ export function Refinement({ playlistId = "pl_01", onBack }: RefinementProps) {
           </p>
           <button
             data-testid="export-to-spotify-button"
-            onClick={() => setShowExport(true)}
+            onClick={() => {
+              const ids = displayTracks.map((t) => t.id);
+              if (onExport) onExport(ids);
+              else setShowExport(true);
+            }}
             style={{
               padding: "10px 28px",
               borderRadius: 10,

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 
 interface LoginProps {
   onAuthenticated: () => void;
@@ -19,13 +20,38 @@ export function Login({ onAuthenticated }: LoginProps) {
     setError(null);
     try {
       await invoke("start_oauth", { clientId });
-      // The OAuth flow opens the system browser. The deep-link callback
-      // (octave://callback) will complete auth in the Rust layer. Poll
-      // get_auth_state until authenticated.
+
+      // Primary signal: the Rust deep-link handler emits "oauth-complete" once
+      // tokens are stored in the keychain. This fires as soon as Spotify
+      // redirects back — no polling delay.
+      let unlistenComplete: (() => void) | null = null;
+      let unlistenError: (() => void) | null = null;
+
+      const cleanup = () => {
+        unlistenComplete?.();
+        unlistenError?.();
+      };
+
+      unlistenComplete = await listen<void>("oauth-complete", () => {
+        cleanup();
+        clearInterval(poll);
+        onAuthenticated();
+      });
+
+      unlistenError = await listen<string>("oauth-error", (event) => {
+        cleanup();
+        clearInterval(poll);
+        setLoading(false);
+        setError(event.payload ?? "Spotify login failed. Please try again.");
+      });
+
+      // Fallback: poll get_auth_state in case the event is missed (e.g. the
+      // window was backgrounded when the deep-link fired).
       const poll = setInterval(async () => {
         try {
           const state = await invoke<{ is_authenticated: boolean }>("get_auth_state");
           if (state.is_authenticated) {
+            cleanup();
             clearInterval(poll);
             onAuthenticated();
           }
@@ -34,8 +60,9 @@ export function Login({ onAuthenticated }: LoginProps) {
         }
       }, 1000);
 
-      // Stop polling after 5 minutes (browser tab closed / timed out)
+      // Stop everything after 5 minutes
       setTimeout(() => {
+        cleanup();
         clearInterval(poll);
         setLoading(false);
         setError("Authentication timed out. Please try again.");

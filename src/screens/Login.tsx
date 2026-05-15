@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 
@@ -9,6 +9,28 @@ interface LoginProps {
 export function Login({ onAuthenticated }: LoginProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Shows a nudge after 30 s of waiting so the user knows what to do
+  const [waitTooLong, setWaitTooLong] = useState(false);
+
+  // Stores the active cleanup fn so the Cancel button can call it
+  const cancelRef = useRef<(() => void) | null>(null);
+
+  // Start / clear the 30-second hint timer whenever loading changes
+  useEffect(() => {
+    if (!loading) {
+      setWaitTooLong(false);
+      return;
+    }
+    const t = setTimeout(() => setWaitTooLong(true), 30_000);
+    return () => clearTimeout(t);
+  }, [loading]);
+
+  function cancelAuth() {
+    cancelRef.current?.();
+    cancelRef.current = null;
+    setLoading(false);
+    setError(null);
+  }
 
   async function handleConnect() {
     const clientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID as string | undefined;
@@ -21,38 +43,44 @@ export function Login({ onAuthenticated }: LoginProps) {
     try {
       await invoke("start_oauth", { clientId });
 
-      // Primary signal: the Rust deep-link handler emits "oauth-complete" once
-      // tokens are stored in the keychain. This fires as soon as Spotify
-      // redirects back — no polling delay.
+      // Primary signal: Rust deep-link handler emits "oauth-complete" once
+      // tokens are stored. Fires as soon as Spotify redirects back.
       let unlistenComplete: (() => void) | null = null;
       let unlistenError: (() => void) | null = null;
 
       const cleanup = () => {
         unlistenComplete?.();
         unlistenError?.();
+        clearInterval(poll);
+        clearTimeout(timeout);
+        cancelRef.current = null;
+      };
+
+      // Expose cleanup so the Cancel button can call it
+      cancelRef.current = () => {
+        cleanup();
+        setLoading(false);
+        setError(null);
       };
 
       unlistenComplete = await listen<void>("oauth-complete", () => {
         cleanup();
-        clearInterval(poll);
         onAuthenticated();
       });
 
       unlistenError = await listen<string>("oauth-error", (event) => {
         cleanup();
-        clearInterval(poll);
         setLoading(false);
         setError(event.payload ?? "Spotify login failed. Please try again.");
       });
 
-      // Fallback: poll get_auth_state in case the event is missed (e.g. the
-      // window was backgrounded when the deep-link fired).
+      // Fallback poll — catches the case where the event is missed
+      // (e.g. window was backgrounded when the deep-link fired)
       const poll = setInterval(async () => {
         try {
           const state = await invoke<{ is_authenticated: boolean }>("get_auth_state");
           if (state.is_authenticated) {
             cleanup();
-            clearInterval(poll);
             onAuthenticated();
           }
         } catch {
@@ -60,14 +88,14 @@ export function Login({ onAuthenticated }: LoginProps) {
         }
       }, 1000);
 
-      // Stop everything after 5 minutes
-      setTimeout(() => {
+      // Hard timeout after 5 minutes
+      const timeout = setTimeout(() => {
         cleanup();
-        clearInterval(poll);
         setLoading(false);
         setError("Authentication timed out. Please try again.");
       }, 300_000);
     } catch (err) {
+      cancelRef.current = null;
       setError("Could not open Spotify login. Please try again.");
       setLoading(false);
     }
@@ -191,6 +219,51 @@ export function Login({ onAuthenticated }: LoginProps) {
         </svg>
         {loading ? "Waiting for Spotify…" : "Connect Spotify"}
       </button>
+
+      {/* Controls shown while waiting */}
+      {loading && (
+        <div
+          style={{
+            marginTop: 20,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          {waitTooLong && (
+            <p
+              style={{
+                fontSize: 13,
+                color: "rgba(255,255,255,0.45)",
+                margin: 0,
+                textAlign: "center",
+                maxWidth: 300,
+              }}
+            >
+              Taking longer than expected? Make sure you clicked{" "}
+              <strong style={{ color: "rgba(255,255,255,0.7)" }}>Agree</strong>{" "}
+              on the Spotify page and that Octave is set as the default handler
+              for the <code style={{ fontSize: 12 }}>octave://</code> link.
+            </p>
+          )}
+          <button
+            onClick={cancelAuth}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "rgba(255,255,255,0.35)",
+              cursor: "pointer",
+              fontSize: 13,
+              fontFamily: "inherit",
+              padding: "4px 8px",
+              textDecoration: "underline",
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       <p
         style={{

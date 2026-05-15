@@ -3,8 +3,95 @@ mod commands;
 mod db;
 
 use auth::OAuthState;
-use tauri::{Emitter, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
+
+// ── OAuth URL handler ─────────────────────────────────────────────────────────
+//
+// Called from TWO places:
+//   1. on_open_url  — deep-link plugin fires this when the app is launched
+//                     with an octave:// URL (first-launch / macOS case).
+//   2. single-instance argv handler — on Windows, when an existing instance is
+//                     running, the single-instance plugin forwards the second
+//                     instance's argv here. on_open_url does NOT fire in this
+//                     path, so we must parse the URL from argv ourselves.
+
+fn process_oauth_url(app: &AppHandle, url_str: &str) {
+    let url = match url::Url::parse(url_str) {
+        Ok(u) => u,
+        Err(_) => return, // not a URL, skip silently
+    };
+
+    if url.scheme() != "octave" || url.host_str() != Some("callback") {
+        return;
+    }
+
+    log::info!("OAuth: processing callback URL");
+
+    let mut code_opt: Option<String> = None;
+    let mut state_opt: Option<String> = None;
+    for (k, v) in url.query_pairs() {
+        match k.as_ref() {
+            "code" => code_opt = Some(v.into_owned()),
+            "state" => state_opt = Some(v.into_owned()),
+            _ => {}
+        }
+    }
+
+    let (code, received_state) = match (code_opt, state_opt) {
+        (Some(c), Some(s)) => (c, s),
+        _ => {
+            log::warn!("OAuth: callback URL missing code or state: {url_str}");
+            return;
+        }
+    };
+
+    let handle = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let oauth_state = handle.state::<OAuthState>();
+
+        // CSRF check — validate state parameter
+        let expected_state: Option<String> =
+            oauth_state.oauth_state.lock().unwrap().clone();
+        if expected_state.as_deref() != Some(received_state.as_str()) {
+            log::error!("OAuth: state mismatch — possible CSRF, ignoring callback");
+            let _ = handle.emit(
+                "oauth-error",
+                "Security check failed — please try logging in again.",
+            );
+            return;
+        }
+
+        // Read client_id stored during start_oauth
+        let client_id: String = {
+            let guard = oauth_state.client_id.lock().unwrap();
+            match guard.as_ref() {
+                Some(cid) => cid.clone(),
+                None => {
+                    log::error!("OAuth: callback received but no client_id in state");
+                    let _ = handle.emit(
+                        "oauth-error",
+                        "Login session expired — please try again.",
+                    );
+                    return;
+                }
+            }
+        };
+
+        match auth::handle_callback(&code, &client_id, &oauth_state).await {
+            Ok(()) => {
+                log::info!("OAuth: token exchange complete — stored in keychain");
+                let _ = handle.emit("oauth-complete", ());
+            }
+            Err(e) => {
+                log::error!("OAuth: token exchange failed: {e}");
+                let _ = handle.emit("oauth-error", e);
+            }
+        }
+    });
+}
+
+// ── App entry point ───────────────────────────────────────────────────────────
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -13,15 +100,23 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_shell::init())
-        // single-instance MUST be registered before deep-link so that when
-        // Spotify redirects to octave://callback, Windows routes the URL to
-        // the already-running process (which holds the PKCE state in memory)
-        // instead of launching a fresh second instance.
-        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+        // single-instance MUST be before deep-link.
+        // On Windows, Spotify's redirect opens a second Octave process with
+        // the octave://callback URL in its argv. Single-instance intercepts
+        // that second process and forwards argv to the already-running one.
+        // We parse argv here because on_open_url does NOT fire in this path.
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            log::info!("Single-instance: new launch blocked, argv={argv:?}");
+
             // Bring the existing window to the foreground
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.show();
                 let _ = window.set_focus();
+            }
+
+            // Check every argv token for an octave:// URL (argv[0] is the exe)
+            for arg in argv.iter().skip(1) {
+                process_oauth_url(app, arg);
             }
         }))
         .plugin(tauri_plugin_deep_link::init())
@@ -32,74 +127,19 @@ pub fn run() {
             let db_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = db::init_db(&db_handle).await {
-                    log::error!("Failed to initialize database: {e}");
+                    log::error!("DB init failed: {e}");
                 }
             });
 
-            // Handle OAuth deep-link callback: octave://callback?code=...&state=...
+            // on_open_url fires when the app itself is launched with a deep-link
+            // URL (e.g. first run, or macOS which always routes to running app).
+            // On Windows with single-instance this path is typically NOT taken —
+            // the URL arrives in the single-instance argv above instead.
             let dl_handle = app.handle().clone();
             app.deep_link().on_open_url(move |event| {
                 for url in event.urls() {
-                    // Only handle our callback path
-                    if url.scheme() != "octave" || url.host_str() != Some("callback") {
-                        continue;
-                    }
-
-                    // Extract code and state from query string
-                    let mut code_opt: Option<String> = None;
-                    let mut state_opt: Option<String> = None;
-                    for (k, v) in url.query_pairs() {
-                        match k.as_ref() {
-                            "code" => code_opt = Some(v.into_owned()),
-                            "state" => state_opt = Some(v.into_owned()),
-                            _ => {}
-                        }
-                    }
-
-                    let (code, received_state) = match (code_opt, state_opt) {
-                        (Some(c), Some(s)) => (c, s),
-                        _ => {
-                            log::warn!("OAuth callback missing code or state");
-                            continue;
-                        }
-                    };
-
-                    let handle = dl_handle.clone();
-                    tauri::async_runtime::spawn(async move {
-                        let oauth_state = handle.state::<OAuthState>();
-
-                        // CSRF check — validate state parameter
-                        let expected_state: Option<String> =
-                            oauth_state.oauth_state.lock().unwrap().clone();
-                        if expected_state.as_deref() != Some(received_state.as_str()) {
-                            log::error!("OAuth state mismatch — possible CSRF, ignoring callback");
-                            return;
-                        }
-
-                        // Read client_id stored during start_oauth
-                        let client_id: String = {
-                            let guard = oauth_state.client_id.lock().unwrap();
-                            match guard.as_ref() {
-                                Some(cid) => cid.clone(),
-                                None => {
-                                    log::error!("OAuth callback: no client_id in state");
-                                    return;
-                                }
-                            }
-                        };
-
-                        match auth::handle_callback(&code, &client_id, &oauth_state).await {
-                            Ok(()) => {
-                                log::info!("OAuth complete — tokens stored in keychain");
-                                // Notify the frontend so it can skip polling
-                                let _ = handle.emit("oauth-complete", ());
-                            }
-                            Err(e) => {
-                                log::error!("OAuth token exchange failed: {e}");
-                                let _ = handle.emit("oauth-error", e);
-                            }
-                        }
-                    });
+                    log::info!("on_open_url: {url}");
+                    process_oauth_url(&dl_handle, url.as_str());
                 }
             });
 

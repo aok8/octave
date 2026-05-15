@@ -27,3 +27,6 @@ Thumbs.db
 # Local env
 .env
 .env.local
+
+# Internal docs (sprint history, architecture notes — not for public repo)
+InternalInfo.md

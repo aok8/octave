@@ -33,8 +33,9 @@ Octave lets you build playlists from seed tracks or existing playlists, visualiz
 | Sprint 11 | CI Rust check, Inter font bundling, MIT LICENSE, NSIS path fix | ✅ Done |
 | Sprint 12 | GET /health test, WCAG AA axe-core audit (9 screens, 0 violations), Cargo.lock | ✅ Done |
 | Sprint 13 | End-to-end IPC smoke tests: 10 Rust lib tests (wiremock), Python cross-endpoint integration test, CI upgrade to cargo test --lib | ✅ Done |
+| Sprint 14 | Advanced Insights (F-13): Tempo Map + Key Distribution charts, extended /insights API, fixed IPC type mismatch | ✅ Done |
 
-**Test coverage**: 126 Python pytest · 119 Vitest (15 test files) — all passing on `master`.
+**Test coverage**: 127 Python pytest · 131 Vitest (17 test files) — all passing on `master`.
 
 ## Features
 

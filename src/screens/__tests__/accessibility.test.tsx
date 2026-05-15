@@ -61,6 +61,14 @@ vi.mock("../../charts/FlowChart", () => ({
   FlowChart: () => <svg role="img" aria-label="Audio flow chart" />,
 }));
 
+vi.mock("../../charts/TempoMap", () => ({
+  TempoMap: () => <svg role="img" aria-label="Tempo map showing BPM over track order" />,
+}));
+
+vi.mock("../../charts/KeyChart", () => ({
+  KeyChart: () => <svg role="img" aria-label="Key distribution chart showing musical keys across the playlist" />,
+}));
+
 const mockInvoke = vi.mocked(invoke);
 
 // Default mock: return empty array. Tests that need structured responses
@@ -112,6 +120,18 @@ describe.sequential("WCAG AA accessibility audit", () => {
   }, 10000);
 
   it("Insights screen has no violations", async () => {
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "fetch_insights") {
+        return Promise.resolve({
+          playlist_id: "pl_test",
+          genre_breakdown: [],
+          timeline: [],
+          total_tracks: 0,
+          key_distribution: {},
+        });
+      }
+      return Promise.resolve([]);
+    });
     const results = await renderAndAudit(
       <Insights playlistId="pl_test" />
     );

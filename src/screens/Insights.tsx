@@ -5,40 +5,38 @@ import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
 import { DonutChart } from "../charts/DonutChart";
 import { FlowChart } from "../charts/FlowChart";
+import { TempoMap } from "../charts/TempoMap";
+import { KeyChart } from "../charts/KeyChart";
 import type { Track, AudioFeatures } from "../types";
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Types matching the Python /insights API response ─────────────────────────
 
-interface GenreDataPoint {
+interface GenreBreakdownEntry {
   genre: string;
   count: number;
   color: string;
+  subgenres: string[];
 }
 
-interface FlowDataPoint {
+interface TimelineEntry {
   position: number;
-  energy: number;
-  valence: number;
-  danceability: number;
+  track_id: string;
+  energy: number | null;
+  valence: number | null;
+  danceability: number | null;
+  tempo: number | null;
+  popularity: number | null;
+  key: string | null;
+  genre: string;
 }
 
-interface InsightsData {
-  genreBreakdown: GenreDataPoint[];
-  audioFlow: FlowDataPoint[];
-  tracks: Track[];
+interface InsightsResponse {
+  playlist_id: string;
+  genre_breakdown: GenreBreakdownEntry[];
+  timeline: TimelineEntry[];
+  total_tracks: number;
+  key_distribution: Record<string, number>;
 }
-
-// ── Genre color palette (from requirements §6) ────────────────────────────────
-
-const GENRE_PALETTE: Record<string, string> = {
-  "R&B": "#6A0DAD",
-  "Neo-Soul": "#FF914D",
-  "Hip-Hop": "#1DB9FF",
-  "Chill Pop": "#FF6FAE",
-  "Lo-Fi": "#4DB6AC",
-  "Nu-Jazz": "#FFD93D",
-  Other: "#555555",
-};
 
 // ── Insights screen ───────────────────────────────────────────────────────────
 
@@ -47,17 +45,34 @@ interface InsightsProps {
   onBack?: () => void;
 }
 
+const SECTION_LABEL: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  color: "rgba(255,255,255,0.40)",
+  textTransform: "uppercase",
+  letterSpacing: "0.08em",
+  margin: "0 0 16px",
+};
+
+const EMPTY_CARD: React.CSSProperties = {
+  height: 160,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  color: "rgba(255,255,255,0.25)",
+  fontSize: 13,
+  border: "1px dashed rgba(255,255,255,0.10)",
+  borderRadius: 8,
+};
+
 export function Insights({ playlistId, onBack }: InsightsProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [insightsData, setInsightsData] = useState<InsightsData | null>(null);
-  const [trackIds, setTrackIds] = useState<string[]>([]);
+  const [insights, setInsights] = useState<InsightsResponse | null>(null);
   const [audioFeatures, setAudioFeatures] = useState<AudioFeatures[]>([]);
 
   useEffect(() => {
-    if (playlistId) {
-      loadInsights();
-    }
+    if (playlistId) loadInsights();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlistId]);
 
@@ -65,33 +80,18 @@ export function Insights({ playlistId, onBack }: InsightsProps) {
     setLoading(true);
     setError(null);
     try {
-      // Fetch insights (added by Agent B — wrapped in try/catch)
-      let data: InsightsData | null = null;
-      try {
-        data = await invoke<InsightsData>("fetch_insights", { playlistId });
-      } catch {
-        // fetch_insights may not exist yet — fall through to audio features fallback
-      }
+      const data = await invoke<InsightsResponse>("fetch_insights", { playlistId });
+      setInsights(data);
 
-      // Fetch audio features for tracks
+      // Audio features for the TrackCard enrichment (supplemental, non-fatal)
+      const trackIds = data.timeline.map((t) => t.track_id);
       if (trackIds.length > 0) {
         try {
           const features = await invoke<AudioFeatures[]>("fetch_audio_features", { trackIds });
           setAudioFeatures(features);
         } catch {
-          // Audio features are supplemental — non-fatal
+          // non-fatal
         }
-      }
-
-      if (data) {
-        setInsightsData(data);
-      } else {
-        // Provide empty-state data so charts can still render
-        setInsightsData({
-          genreBreakdown: buildDefaultGenreData(),
-          audioFlow: [],
-          tracks: [],
-        });
       }
     } catch (err) {
       setError("Could not load insights. Check your connection and try again.");
@@ -100,19 +100,25 @@ export function Insights({ playlistId, onBack }: InsightsProps) {
     }
   }
 
-  function buildDefaultGenreData(): GenreDataPoint[] {
-    return Object.entries(GENRE_PALETTE).map(([genre, color]) => ({
-      genre,
-      count: 0,
-      color,
-    }));
-  }
+  // Derived data for charts
+  const genreData = insights?.genre_breakdown ?? [];
+  const hasGenreData = genreData.some((d) => d.count > 0);
 
-  const hasGenreData =
-    insightsData?.genreBreakdown?.some((d) => d.count > 0) ?? false;
+  const flowData = (insights?.timeline ?? []).map((t) => ({
+    position: t.position,
+    energy: t.energy ?? 0,
+    valence: t.valence ?? 0,
+    danceability: t.danceability ?? 0,
+  }));
 
-  const hasFlowData =
-    Array.isArray(insightsData?.audioFlow) && insightsData!.audioFlow.length > 0;
+  const tempoData = (insights?.timeline ?? []).map((t) => ({
+    position: t.position,
+    tempo: t.tempo,
+  }));
+  const hasTempoData = tempoData.some((d) => d.tempo != null);
+
+  const keyDistribution = insights?.key_distribution ?? {};
+  const hasKeyData = Object.keys(keyDistribution).length > 0;
 
   return (
     <div
@@ -127,7 +133,7 @@ export function Insights({ playlistId, onBack }: InsightsProps) {
         gap: 32,
       }}
     >
-      {/* ── Header ──────────────────────────────────────────────────────── */}
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {onBack && (
           <button
@@ -165,7 +171,7 @@ export function Insights({ playlistId, onBack }: InsightsProps) {
         </div>
       </div>
 
-      {/* ── Content ──────────────────────────────────────────────────────── */}
+      {/* ── Content ─────────────────────────────────────────────────────────── */}
       {loading ? (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <LoadingState type="chart" />
@@ -182,104 +188,64 @@ export function Insights({ playlistId, onBack }: InsightsProps) {
             alignItems: "start",
           }}
         >
-          {/* ── Left: charts ──────────────────────────────────────────────── */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          {/* ── Left: charts ─────────────────────────────────────────────────── */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 28 }}>
             {/* Genre donut */}
-            <section>
-              <h2
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "rgba(255,255,255,0.40)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  margin: "0 0 16px",
-                }}
-              >
-                Genre Breakdown
-              </h2>
+            <section aria-label="Genre breakdown">
+              <h2 style={SECTION_LABEL}>Genre Breakdown</h2>
               {hasGenreData ? (
-                <DonutChart data={insightsData!.genreBreakdown} />
+                <DonutChart data={genreData} />
               ) : (
-                <div
-                  style={{
-                    height: 260,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "rgba(255,255,255,0.25)",
-                    fontSize: 13,
-                    border: "1px dashed rgba(255,255,255,0.10)",
-                    borderRadius: 8,
-                  }}
-                >
-                  Genre data unavailable
-                </div>
+                <div style={EMPTY_CARD}>Genre data unavailable</div>
               )}
             </section>
 
             {/* Audio flow */}
-            <section>
-              <h2
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "rgba(255,255,255,0.40)",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  margin: "0 0 16px",
-                }}
-              >
-                Audio Flow
-              </h2>
-              {hasFlowData ? (
-                <FlowChart data={insightsData!.audioFlow} />
+            <section aria-label="Audio flow">
+              <h2 style={SECTION_LABEL}>Audio Flow</h2>
+              {flowData.length > 0 ? (
+                <FlowChart data={flowData} />
               ) : (
-                <div
-                  style={{
-                    height: 200,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    color: "rgba(255,255,255,0.25)",
-                    fontSize: 13,
-                    border: "1px dashed rgba(255,255,255,0.10)",
-                    borderRadius: 8,
-                  }}
-                >
-                  Audio flow data unavailable
-                </div>
+                <div style={EMPTY_CARD}>Audio flow data unavailable</div>
+              )}
+            </section>
+
+            {/* Tempo map */}
+            <section aria-label="Tempo map">
+              <h2 style={SECTION_LABEL}>Tempo Map</h2>
+              {hasTempoData ? (
+                <TempoMap data={tempoData} />
+              ) : (
+                <div style={{ ...EMPTY_CARD, height: 100 }}>Tempo data unavailable</div>
+              )}
+            </section>
+
+            {/* Key distribution */}
+            <section aria-label="Key distribution">
+              <h2 style={SECTION_LABEL}>Key Distribution</h2>
+              {hasKeyData ? (
+                <KeyChart data={keyDistribution} />
+              ) : (
+                <div style={{ ...EMPTY_CARD, height: 100 }}>Key data unavailable</div>
               )}
             </section>
           </div>
 
-          {/* ── Right: track list ─────────────────────────────────────────── */}
-          <section>
-            <h2
-              style={{
-                fontSize: 12,
-                fontWeight: 600,
-                color: "rgba(255,255,255,0.40)",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-                margin: "0 0 16px",
-              }}
-            >
-              Tracks
-            </h2>
-            {insightsData?.tracks && insightsData.tracks.length > 0 ? (
-              <div
-                style={{
-                  maxHeight: 520,
-                  overflowY: "auto",
-                  paddingRight: 4,
-                }}
-              >
-                {insightsData.tracks.map((track) => {
-                  const features = audioFeatures.find((f) => f.trackId === track.id);
-                  return (
-                    <TrackCard key={track.id} track={track} features={features} />
-                  );
+          {/* ── Right: track list ───────────────────────────────────────────── */}
+          <section aria-label="Tracks">
+            <h2 style={SECTION_LABEL}>Tracks</h2>
+            {insights && insights.timeline.length > 0 ? (
+              <div style={{ maxHeight: 720, overflowY: "auto", paddingRight: 4 }}>
+                {insights.timeline.map((t) => {
+                  const features = audioFeatures.find((f) => f.trackId === t.track_id);
+                  // Minimal Track shape for TrackCard
+                  const track: Track = {
+                    id: t.track_id,
+                    name: t.track_id,
+                    artistNames: [],
+                    popularity: t.popularity ?? 0,
+                  };
+                  return <TrackCard key={t.track_id} track={track} features={features} />;
                 })}
               </div>
             ) : (

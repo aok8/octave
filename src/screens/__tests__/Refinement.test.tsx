@@ -48,23 +48,38 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 const mockInvoke = vi.mocked(invoke);
 
+// ── Test fixtures ─────────────────────────────────────────────────────────────
+
+const MOCK_TRACK_IDS = Array.from({ length: 12 }, (_, i) =>
+  `tr_${String(i + 1).padStart(2, "0")}`
+);
+
+const MOCK_TRACKS = MOCK_TRACK_IDS.map((id, i) => ({
+  id,
+  name: `Track ${i + 1}`,
+  artistNames: [`Artist ${i + 1}`],
+  albumName: `Album ${i + 1}`,
+  durationMs: 200000,
+  popularity: 50,
+}));
+
 // ── Setup / teardown ─────────────────────────────────────────────────────────
 
 beforeEach(() => {
   vi.useFakeTimers();
-  // Default: fetch_audio_features throws so we fall back to mock data;
+  // fetch_playlist_tracks returns mock tracks;
+  // fetch_audio_features throws so sliders default to 0 (no mock fallback);
   // refine_playlist returns identity ordering.
   mockInvoke.mockImplementation((cmd: string) => {
+    if (cmd === "fetch_playlist_tracks") {
+      return Promise.resolve(MOCK_TRACKS);
+    }
     if (cmd === "fetch_audio_features") {
       return Promise.reject(new Error("not available"));
     }
     if (cmd === "refine_playlist") {
-      // Return first 12 track IDs in order
       return Promise.resolve({
-        orderedTrackIds: [
-          "tr_01","tr_02","tr_03","tr_04","tr_05","tr_06",
-          "tr_07","tr_08","tr_09","tr_10","tr_11","tr_12",
-        ],
+        orderedTrackIds: MOCK_TRACK_IDS,
         removedTrackIds: [],
       });
     }

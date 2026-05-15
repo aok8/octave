@@ -5,7 +5,7 @@
  *   S8 — Discovery Mode: swipe cards, keyboard nav, queue drawer, export
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
 import { LoadingState } from "../components/LoadingState";
@@ -115,6 +115,25 @@ export function DiscoveryMode({ seedTrackId, onBack }: DiscoveryModeProps) {
   const handleSkip = useCallback(() => sendFeedback("skip"), [sendFeedback]);
   const handleKeep = useCallback(() => sendFeedback("keep"), [sendFeedback]);
 
+  // Track whether we have already called end_discovery_session to avoid double-fire
+  const sessionEndedRef = useRef(false);
+
+  // End session when all tracks are exhausted (normal completion)
+  useEffect(() => {
+    if (!sessionId || !sessionComplete || sessionEndedRef.current) return;
+    sessionEndedRef.current = true;
+    invoke("end_discovery_session", { session_id: sessionId }).catch(() => {});
+  }, [sessionId, sessionComplete]);
+
+  // End session on unmount if the user navigates away before completion
+  useEffect(() => {
+    return () => {
+      if (sessionId && !sessionEndedRef.current) {
+        invoke("end_discovery_session", { session_id: sessionId }).catch(() => {});
+      }
+    };
+  }, [sessionId]);
+
   // Keyboard shortcuts: ArrowLeft = skip, ArrowRight = keep
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -129,7 +148,10 @@ export function DiscoveryMode({ seedTrackId, onBack }: DiscoveryModeProps) {
   async function handleExport() {
     const ids = keptTracks.map((t) => t.id);
     try {
-      await invoke("start_discovery_export", { track_ids: ids });
+      await invoke("start_discovery_export", {
+        track_ids: ids,
+        name: "Octave Discovery",
+      });
     } catch {
       // Export errors are non-fatal; toast feedback could be added later
     }

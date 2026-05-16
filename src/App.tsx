@@ -151,7 +151,9 @@ export default function App() {
           <Insights
             playlistId={screen.playlistId}
             onBack={() => setScreen({ id: "seed-playlist" })}
-            onRefine={() => setScreen({ id: "refinement", playlistId: screen.playlistId })}
+            // onRefine temporarily disabled — Spotify deprecated the audio-features
+            // API so the Refinement screen cannot produce meaningful recommendations.
+            // Restore once an alternative recommendations source is integrated.
           />
         );
 

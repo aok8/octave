@@ -43,13 +43,19 @@ def _synthetic_features(track_id: str) -> dict:
         "mode": 1,
         "time_signature": 4,
         "duration_ms": None,
+        "source": "synthetic",
     }
 
 
-def _spotify_features_to_dict(raw: dict) -> dict:
-    """Map a Spotify audio features object to our DB/response shape."""
+def _spotify_features_to_dict(raw: dict, source: str = "spotify") -> dict:
+    """Map a Spotify audio features object to our DB/response shape.
+
+    The ``source`` parameter is forwarded from the caller so that RapidAPI
+    results can be marked as ``"rapidapi"`` while Spotify results keep the
+    default ``"spotify"`` label.
+    """
     return {
-        "track_id": raw["id"],
+        "track_id": raw.get("track_id") or raw.get("id"),
         "energy": raw.get("energy"),
         "tempo": raw.get("tempo"),
         "valence": raw.get("valence"),
@@ -62,6 +68,7 @@ def _spotify_features_to_dict(raw: dict) -> dict:
         "mode": raw.get("mode"),
         "time_signature": raw.get("time_signature"),
         "cached_at": int(time.time()),
+        "source": raw.get("source") or source,
     }
 
 
@@ -81,6 +88,7 @@ def _response_features(row: dict) -> dict:
         "mode": row.get("mode"),
         "time_signature": row.get("time_signature"),
         "cached_at": row.get("cached_at"),
+        "source": row.get("source"),
     }
 
 
@@ -142,6 +150,7 @@ def get_audio_features(
                             rapid_results = rapidapi_client.get_features_batch(batch, rapidapi_key)
                             fetched_ids = set()
                             for row in rapid_results:
+                                row.setdefault("source", "rapidapi")
                                 upsert_audio_features(conn, row)
                                 cached_map[row["track_id"]] = row
                                 fetched_ids.add(row["track_id"])

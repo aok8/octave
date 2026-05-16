@@ -10,25 +10,30 @@ export interface FlowDataPoint {
   danceability: number;
 }
 
-type StackKey = "energy" | "valence" | "danceability";
+type MetricKey = "energy" | "valence" | "danceability";
 
 // ── Color config ──────────────────────────────────────────────────────────────
 
-const STACK_COLORS: Record<StackKey, string> = {
+const METRIC_COLORS: Record<MetricKey, string> = {
   energy: "#FF914D",
   valence: "#FFD93D",
   danceability: "#FF6FAE",
 };
 
-const STACK_LABELS: Record<StackKey, string> = {
+const METRIC_LABELS: Record<MetricKey, string> = {
   energy: "Energy",
   valence: "Valence",
   danceability: "Danceability",
 };
 
-const STACK_KEYS: StackKey[] = ["energy", "valence", "danceability"];
+const METRIC_KEYS: MetricKey[] = ["energy", "valence", "danceability"];
 
 // ── FlowChart ─────────────────────────────────────────────────────────────────
+//
+// Renders three overlapping area+line series on a shared 0–1 Y axis.
+// Each metric is drawn independently (NOT stacked) so their absolute levels
+// are directly comparable — e.g. Energy=0.56, Valence=0.97 plot as distinct
+// bands rather than collapsing into a single cumulative stack.
 
 interface FlowChartProps {
   data: FlowDataPoint[];
@@ -53,53 +58,65 @@ export function FlowChart({ data, width = 480, height = 200 }: FlowChartProps) {
       .append("g")
       .attr("transform", `translate(${margin.left},${margin.top})`);
 
-    // Scales
+    // Scales — each metric is independently on 0–1
     const xScale = d3
       .scaleLinear()
       .domain([0, data.length - 1])
       .range([0, innerW]);
 
-    const yScale = d3.scaleLinear().domain([0, 3]).range([innerH, 0]); // 3 stacked values each max 1
+    const yScale = d3.scaleLinear().domain([0, 1]).range([innerH, 0]);
 
-    // Stack generator
-    const stack = d3
-      .stack<FlowDataPoint, StackKey>()
-      .keys(STACK_KEYS)
-      .value((d, key) => d[key])
-      .order(d3.stackOrderNone)
-      .offset(d3.stackOffsetNone);
+    // Gridlines (subtle)
+    g.append("g")
+      .attr("class", "grid")
+      .call(
+        d3
+          .axisLeft(yScale)
+          .ticks(4)
+          .tickSize(-innerW)
+          .tickFormat(() => "")
+      )
+      .call((axis) => {
+        axis.select(".domain").remove();
+        axis
+          .selectAll(".tick line")
+          .attr("stroke", "rgba(255,255,255,0.06)");
+      });
 
-    const series = stack(data);
+    // Draw each metric as a filled area + stroke line (overlapping, NOT stacked)
+    METRIC_KEYS.forEach((key) => {
+      const color = METRIC_COLORS[key];
 
-    // Area generator
-    const area = d3
-      .area<d3.SeriesPoint<FlowDataPoint>>()
-      .x((_d, i) => xScale(i))
-      .y0((d) => yScale(d[0]))
-      .y1((d) => yScale(d[1]))
-      .curve(d3.curveCatmullRom.alpha(0.5));
+      // Filled area (semi-transparent so overlaps are readable)
+      const area = d3
+        .area<FlowDataPoint>()
+        .x((_d, i) => xScale(i))
+        .y0(innerH)
+        .y1((d) => yScale(d[key]))
+        .curve(d3.curveCatmullRom.alpha(0.5));
 
-    // Draw stacked areas
-    series.forEach((layer) => {
-      const key = layer.key as StackKey;
       g.append("path")
-        .datum(layer)
+        .datum(data)
         .attr("data-testid", `flow-area-${key}`)
         .attr("d", area)
-        .attr("fill", STACK_COLORS[key])
-        .attr("opacity", 0.65)
-        .on("mouseenter", function () {
-          d3.select(this)
-            .transition()
-            .duration(150)
-            .attr("opacity", 0.9);
-        })
-        .on("mouseleave", function () {
-          d3.select(this)
-            .transition()
-            .duration(150)
-            .attr("opacity", 0.65);
-        });
+        .attr("fill", color)
+        .attr("opacity", 0.18);
+
+      // Stroke line on top — easier to read the exact level
+      const line = d3
+        .line<FlowDataPoint>()
+        .x((_d, i) => xScale(i))
+        .y((d) => yScale(d[key]))
+        .curve(d3.curveCatmullRom.alpha(0.5));
+
+      g.append("path")
+        .datum(data)
+        .attr("data-testid", `flow-line-${key}`)
+        .attr("d", line)
+        .attr("fill", "none")
+        .attr("stroke", color)
+        .attr("stroke-width", 1.5)
+        .attr("opacity", 0.85);
     });
 
     // X axis
@@ -120,9 +137,14 @@ export function FlowChart({ data, width = 480, height = 200 }: FlowChartProps) {
           .attr("font-size", 10);
       });
 
-    // Y axis
+    // Y axis — labels 0%, 50%, 100% for clarity
     g.append("g")
-      .call(d3.axisLeft(yScale).ticks(3))
+      .call(
+        d3
+          .axisLeft(yScale)
+          .ticks(4)
+          .tickFormat((d) => `${Math.round(Number(d) * 100)}%`)
+      )
       .call((axis) => {
         axis.select(".domain").attr("stroke", "rgba(255,255,255,0.15)");
         axis.selectAll(".tick line").attr("stroke", "rgba(255,255,255,0.10)");
@@ -170,20 +192,20 @@ export function FlowChart({ data, width = 480, height = 200 }: FlowChartProps) {
 
       {/* Legend */}
       <div style={{ display: "flex", gap: 16, marginTop: 8 }}>
-        {STACK_KEYS.map((key) => (
+        {METRIC_KEYS.map((key) => (
           <div key={key} style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <div
               style={{
-                width: 10,
-                height: 10,
-                borderRadius: 2,
-                background: STACK_COLORS[key],
-                opacity: 0.8,
+                width: 20,
+                height: 2,
+                borderRadius: 1,
+                background: METRIC_COLORS[key],
+                opacity: 0.9,
                 flexShrink: 0,
               }}
             />
             <span style={{ fontSize: 11, color: "rgba(255,255,255,0.50)" }}>
-              {STACK_LABELS[key]}
+              {METRIC_LABELS[key]}
             </span>
           </div>
         ))}

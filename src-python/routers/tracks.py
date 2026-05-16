@@ -119,6 +119,16 @@ def get_audio_features(
                 rapidapi_key = stored_key
 
         cached_map = get_cached_features(conn, ids)
+
+        # When a RapidAPI key is configured, treat previously-synthesised
+        # entries as cache misses so they get replaced with real data.
+        if rapidapi_key:
+            cached_map = {
+                tid: row
+                for tid, row in cached_map.items()
+                if row.get("source") not in (None, "synthetic")
+            }
+
         uncached_ids = [tid for tid in ids if tid not in cached_map]
 
         if uncached_ids:

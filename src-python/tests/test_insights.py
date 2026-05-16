@@ -238,13 +238,15 @@ def test_synthetic_fraction_partial(client: TestClient, tmp_db: str):
                 (tid,),
             )
         else:
-            # Real values — distinct from synthetic fingerprint
+            # Real values — distinct from synthetic fingerprint; source='rapidapi'
+            # so the insights router doesn't count them as synthetic.
             conn.execute(
                 """
                 INSERT OR IGNORE INTO audio_features
                     (track_id, energy, tempo, valence, danceability, acousticness,
-                     instrumentalness, speechiness, loudness, key, mode, time_signature)
-                VALUES (?, 0.8, 135.0, 0.7, 0.85, 0.1, 0.0, 0.03, -5.0, 2, 1, 4)
+                     instrumentalness, speechiness, loudness, key, mode, time_signature,
+                     source)
+                VALUES (?, 0.8, 135.0, 0.7, 0.85, 0.1, 0.0, 0.03, -5.0, 2, 1, 4, 'rapidapi')
                 """,
                 (tid,),
             )

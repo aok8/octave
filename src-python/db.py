@@ -224,17 +224,23 @@ def get_cached_tracks(
 def upsert_audio_features(
     conn: sqlite3.Connection, features: Dict[str, Any]
 ) -> None:
-    """Insert or replace an audio_features row."""
+    """Insert or replace an audio_features row.
+
+    The ``source`` column distinguishes real data (``'rapidapi'``,
+    ``'spotify'``) from synthetic fallback values (``'synthetic'``).
+    This lets the cache layer skip stale synthetic entries and re-fetch
+    when a RapidAPI key becomes available.
+    """
     conn.execute(
         """
         INSERT OR REPLACE INTO audio_features
             (track_id, energy, tempo, valence, danceability, acousticness,
              instrumentalness, speechiness, loudness, key, mode,
-             time_signature, cached_at)
+             time_signature, cached_at, source)
         VALUES
             (:track_id, :energy, :tempo, :valence, :danceability,
              :acousticness, :instrumentalness, :speechiness, :loudness,
-             :key, :mode, :time_signature, :cached_at)
+             :key, :mode, :time_signature, :cached_at, :source)
         """,
         {
             "track_id": features["track_id"],
@@ -250,6 +256,7 @@ def upsert_audio_features(
             "mode": features.get("mode"),
             "time_signature": features.get("time_signature"),
             "cached_at": features.get("cached_at", int(time.time())),
+            "source": features.get("source", "synthetic"),
         },
     )
     conn.commit()

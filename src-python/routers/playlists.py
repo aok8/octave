@@ -13,6 +13,7 @@ GET /playlists/{playlist_id}/tracks
 """
 
 import json
+import sys
 import time
 from typing import Optional
 
@@ -89,6 +90,9 @@ def _fetch_and_cache_playlists(sp: spotipy.Spotify, user_id: str) -> list:
             for item in response.get("items") or []:
                 if item is None:
                     continue
+                # Only include playlists the user owns (not followed/saved ones)
+                if (item.get("owner") or {}).get("id") != user_id:
+                    continue
                 row = _spotify_playlist_to_dict(item, user_id)
                 upsert_playlist(conn, row)
                 results.append(row)
@@ -103,7 +107,7 @@ def _fetch_and_cache_playlists(sp: spotipy.Spotify, user_id: str) -> list:
 
 def _spotify_track_to_dict(item: dict) -> dict:
     """Map a Spotify track object (from playlist items) to our DB shape."""
-    track = item.get("track") or item  # items from playlist have nested track
+    track = item.get("track") or item.get("item") or item  # Spotify uses "track" or "item" key
     if track is None:
         return {}
     artists = [a.get("name", "") for a in (track.get("artists") or [])]
@@ -267,14 +271,48 @@ def get_playlist_tracks(
 
     try:
         tracks_out = []
+        local_tracks_out = []
         response = sp.playlist_items(playlist_id, limit=100)
+        items = (response or {}).get("items") or []
+        print(f"[tracks] playlist={playlist_id} total_items={len(items)}", file=sys.stderr, flush=True)
+        # Log structure of first item to diagnose null-track cases
+        if items:
+            first = items[0] or {}
+            t = first.get("track") or first.get("item")
+            print(
+                f"[tracks] first_item keys={list(first.keys())} "
+                f"track_null={t is None} "
+                f"track_id={t.get('id') if t else 'N/A'} "
+                f"track_type={t.get('type') if t else 'N/A'} "
+                f"is_local={first.get('is_local', t.get('is_local') if t else 'N/A')}",
+                file=sys.stderr, flush=True,
+            )
         position = 0
         while response:
             for item in response.get("items") or []:
                 if item is None:
                     continue
-                track = item.get("track")
-                if track is None or track.get("id") is None:
+                # Spotify returns track data under "track" or "item" key
+                track = item.get("track") or item.get("item")
+                # is_local is a top-level field on the playlist item
+                is_local_file = bool(item.get("is_local", False))
+                if track is None:
+                    position += 1
+                    continue
+                # Local files have no Spotify ID — pass them through as-is
+                if track.get("id") is None or is_local_file:
+                    artists = [a.get("name", "") for a in (track.get("artists") or [])]
+                    local_tracks_out.append({
+                        "id": None,
+                        "name": track.get("name", "Unknown"),
+                        "artist_names": artists,
+                        "album_name": (track.get("album") or {}).get("name"),
+                        "album_art_url": None,
+                        "duration_ms": track.get("duration_ms"),
+                        "popularity": None,
+                        "genre_bucket": None,
+                        "is_local": True,
+                    })
                     position += 1
                     continue
                 row = _spotify_track_to_dict(item)
@@ -340,17 +378,20 @@ def get_playlist_tracks(
             if row["id"] in genres_map:
                 row["genres"] = genres_map[row["id"]]
 
+        print(f"[tracks] returning {len(tracks_out)} spotify + {len(local_tracks_out)} local", file=sys.stderr, flush=True)
         update_recently_used(conn, playlist_id)
-        return [_response_track(row) for row in tracks_out]
+        return [_response_track(row) for row in tracks_out] + local_tracks_out
 
     except spotipy.SpotifyException as exc:
         status = exc.http_status if hasattr(exc, "http_status") else 500
+        print(f"[tracks] SpotifyException {status}: {exc}", file=sys.stderr, flush=True)
         if status == 401:
             raise HTTPException(status_code=401, detail="Invalid or expired Spotify token")
         raise HTTPException(status_code=status, detail=str(exc))
     except HTTPException:
         raise
     except Exception as exc:
+        print(f"[tracks] Exception {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
         raise HTTPException(status_code=500, detail=f"Failed to fetch tracks: {exc}")
     finally:
         conn.close()

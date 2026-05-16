@@ -2,12 +2,13 @@
  * Settings screen — Spotify account, storage management, and app info.
  */
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { invoke } from "@tauri-apps/api/core";
 
-// ── Mock user data ────────────────────────────────────────────────────────────
-
-const MOCK_USER = { id: "u1", display_name: "Alain K.", email: "aokouassi@gmail.com" };
+interface UserProfile {
+  display_name: string;
+  email: string;
+}
 
 // ── Shared section styles ─────────────────────────────────────────────────────
 
@@ -58,8 +59,17 @@ const errorStyle: React.CSSProperties = {
 
 // ── Settings screen ───────────────────────────────────────────────────────────
 
-export function Settings() {
+interface SettingsProps {
+  onLogout?: () => void;
+}
+
+export function Settings({ onLogout }: SettingsProps) {
+  const [user, setUser] = useState<UserProfile | null>(null);
   const [logoutSuccess, setLogoutSuccess] = useState(false);
+
+  useEffect(() => {
+    invoke<UserProfile>("get_user_profile").then(setUser).catch(() => {});
+  }, []);
   const [exportSuccess, setExportSuccess] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState(false);
@@ -69,6 +79,7 @@ export function Settings() {
     try {
       await invoke("logout");
       setLogoutSuccess(true);
+      onLogout?.();
     } catch (err) {
       // Swallow — success banner only shown on success
     }
@@ -137,10 +148,10 @@ export function Settings() {
 
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <span style={{ fontSize: 16, fontWeight: 600, color: "#fff" }}>
-            {MOCK_USER.display_name}
+            {user?.display_name ?? "—"}
           </span>
           <span style={{ fontSize: 13, color: "rgba(255,255,255,0.55)" }}>
-            {MOCK_USER.email}
+            {user?.email ?? ""}
           </span>
         </div>
 

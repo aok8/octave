@@ -33,6 +33,7 @@ PLAYLIST_STUB = {
     "public": False,
     "snapshot_id": "snap1",
     "description": "",
+    "owner": {"id": "user1"},
 }
 
 TRACK_STUB = {

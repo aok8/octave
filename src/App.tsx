@@ -176,7 +176,7 @@ export default function App() {
         return <DiscoveryMode seedTrackId={screen.seedTrackId} />;
 
       case "settings":
-        return <Settings />;
+        return <Settings onLogout={() => setScreen({ id: "login" })} />;
 
       default:
         return null;

@@ -42,7 +42,8 @@ const FALLBACK_GRADIENTS = [
   "linear-gradient(135deg, #FF6FAE, #FF914D)",
 ];
 
-function gradientForId(id: string): string {
+function gradientForId(id: string | null): string {
+  if (!id) return FALLBACK_GRADIENTS[0];
   let hash = 0;
   for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) & 0xffff;
   return FALLBACK_GRADIENTS[hash % FALLBACK_GRADIENTS.length];
@@ -63,14 +64,15 @@ export function TrackCard({ track, features, audioFeatures, genres, onClick }: T
   const resolvedFeatures = features ?? audioFeatures;
   const [hovered, setHovered] = useState(false);
   const [imgError, setImgError] = useState(false);
+  const isLocal = track.isLocal === true;
 
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => e.key === "Enter" && onClick?.()}
-      onMouseEnter={() => setHovered(true)}
+      onClick={isLocal ? undefined : onClick}
+      onKeyDown={(e) => !isLocal && e.key === "Enter" && onClick?.()}
+      onMouseEnter={() => !isLocal && setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
         display: "flex",
@@ -78,11 +80,12 @@ export function TrackCard({ track, features, audioFeatures, genres, onClick }: T
         gap: 6,
         padding: "8px 12px",
         borderRadius: 8,
-        cursor: onClick ? "pointer" : "default",
+        cursor: isLocal ? "default" : onClick ? "pointer" : "default",
         background: hovered ? "rgba(255,255,255,0.06)" : "transparent",
         transition: "background 150ms ease",
         width: "100%",
         boxSizing: "border-box",
+        opacity: isLocal ? 0.45 : 1,
       }}
     >
       {/* Row 1: art + text + duration */}
@@ -118,9 +121,29 @@ export function TrackCard({ track, features, audioFeatures, genres, onClick }: T
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
             }}
           >
-            {track.name}
+            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {track.name}
+            </span>
+            {isLocal && (
+              <span
+                style={{
+                  fontSize: 10,
+                  color: "rgba(255,255,255,0.45)",
+                  border: "1px solid rgba(255,255,255,0.20)",
+                  borderRadius: 3,
+                  padding: "1px 5px",
+                  flexShrink: 0,
+                  fontWeight: 400,
+                }}
+              >
+                Local
+              </span>
+            )}
           </div>
           <div
             style={{

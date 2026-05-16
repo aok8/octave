@@ -40,8 +40,10 @@ afterEach(() => {
 describe("Settings screen", () => {
   // ── Account section ───────────────────────────────────────────────────────
 
-  it("renders account section with user info", () => {
+  it("renders account section with user info", async () => {
+    mockInvoke.mockResolvedValueOnce({ display_name: "Alain K.", email: "aokouassi@gmail.com" });
     render(<Settings />);
+    await act(async () => {});
     const section = screen.getByTestId("settings-account-section");
     expect(section).toBeInTheDocument();
     expect(section).toHaveTextContent("Alain K.");

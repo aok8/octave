@@ -21,6 +21,9 @@ interface GenreBreakdownEntry {
 interface TimelineEntry {
   position: number;
   track_id: string;
+  track_name?: string;
+  artist_names?: string[];
+  album_art_url?: string;
   energy: number | null;
   valence: number | null;
   danceability: number | null;
@@ -263,8 +266,9 @@ export function Insights({ playlistId, onBack, onRefine }: InsightsProps) {
                   // Minimal Track shape for TrackCard
                   const track: Track = {
                     id: t.track_id,
-                    name: t.track_id,
-                    artistNames: [],
+                    name: t.track_name ?? t.track_id,
+                    artistNames: t.artist_names ?? [],
+                    albumArtUrl: t.album_art_url,
                     popularity: t.popularity ?? 0,
                   };
                   return <TrackCard key={t.track_id} track={track} features={features} />;

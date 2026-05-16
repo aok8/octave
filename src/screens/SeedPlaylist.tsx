@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { PlaylistCard } from "../components/PlaylistCard";
 import { TrackCard } from "../components/TrackCard";
 import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
 import type { Playlist, Track } from "../types";
+import { normalizePlaylist, normalizeTrack } from "../lib/normalize";
 
 // ── SeedPlaylist screen ───────────────────────────────────────────────────────
 
@@ -24,6 +25,7 @@ export function SeedPlaylist({ onBack, onAnalyze }: SeedPlaylistProps) {
   const [tracks, setTracks] = useState<Track[]>([]);
   const [tracksLoading, setTracksLoading] = useState(false);
   const [tracksError, setTracksError] = useState<string | null>(null);
+  const trackPanelRef = useRef<HTMLDivElement>(null);
 
   // Fetch playlists on mount
   useEffect(() => {
@@ -50,9 +52,10 @@ export function SeedPlaylist({ onBack, onAnalyze }: SeedPlaylistProps) {
     setLoading(true);
     setError(null);
     try {
-      const data = await invoke<Playlist[]>("fetch_playlists");
-      setPlaylists(data);
-      setFilteredPlaylists(data);
+      const data = await invoke<unknown[]>("fetch_playlists");
+      const normalized = data.map(normalizePlaylist);
+      setPlaylists(normalized);
+      setFilteredPlaylists(normalized);
     } catch (err) {
       setError("Could not load playlists. Check your connection and try again.");
     } finally {
@@ -62,14 +65,16 @@ export function SeedPlaylist({ onBack, onAnalyze }: SeedPlaylistProps) {
 
   async function handlePlaylistClick(playlist: Playlist) {
     setSelectedPlaylist(playlist);
+    // Scroll after React paints the panel (next tick)
+    setTimeout(() => trackPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     setTracksLoading(true);
     setTracksError(null);
     setTracks([]);
     try {
-      const data = await invoke<Track[]>("fetch_playlist_tracks", {
+      const data = await invoke<unknown[]>("fetch_playlist_tracks", {
         playlistId: playlist.id,
       });
-      setTracks(data);
+      setTracks(data.map(normalizeTrack));
     } catch (err) {
       setTracksError("Could not load tracks for this playlist.");
     } finally {
@@ -185,7 +190,7 @@ export function SeedPlaylist({ onBack, onAnalyze }: SeedPlaylistProps) {
 
       {/* ── Track list for selected playlist ─────────────────────────────── */}
       {selectedPlaylist && (
-        <div style={{ marginTop: 32 }}>
+        <div ref={trackPanelRef} style={{ marginTop: 32 }}>
           <div
             style={{
               display: "flex",
@@ -250,8 +255,8 @@ export function SeedPlaylist({ onBack, onAnalyze }: SeedPlaylistProps) {
             </p>
           ) : (
             <div>
-              {tracks.map((track) => (
-                <TrackCard key={track.id} track={track} />
+              {tracks.map((track, i) => (
+                <TrackCard key={track.id ?? `local-${i}`} track={track} />
               ))}
             </div>
           )}

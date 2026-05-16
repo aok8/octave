@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 // ── Nav item definition ──────────────────────────────────────────────────────
 
@@ -65,38 +66,59 @@ const NAV_ITEMS: NavItem[] = [
   { id: "settings", label: "Settings", icon: <SettingsIcon /> },
 ];
 
-// ── Traffic light dots ────────────────────────────────────────────────────────
+// ── Windows-style window controls ────────────────────────────────────────────
 
-function TrafficLights() {
+function WindowControls() {
+  const [closeHover, setCloseHover] = useState(false);
+  const [minHover, setMinHover] = useState(false);
+  const [maxHover, setMaxHover] = useState(false);
+
+  const win = getCurrentWindow();
+
+  const btnBase: React.CSSProperties = {
+    width: 46,
+    height: 32,
+    border: "none",
+    background: "transparent",
+    color: "rgba(255,255,255,0.75)",
+    fontSize: 12,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    fontFamily: "inherit",
+    transition: "background 100ms ease",
+  };
+
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, paddingLeft: 16 }}>
-      <div
-        style={{
-          width: 12,
-          height: 12,
-          borderRadius: "50%",
-          background: "#FF5F57",
-          cursor: "default",
-        }}
-      />
-      <div
-        style={{
-          width: 12,
-          height: 12,
-          borderRadius: "50%",
-          background: "#FFBD2E",
-          cursor: "default",
-        }}
-      />
-      <div
-        style={{
-          width: 12,
-          height: 12,
-          borderRadius: "50%",
-          background: "#28CA41",
-          cursor: "default",
-        }}
-      />
+    <div style={{ display: "flex", marginLeft: "auto" }}>
+      <button
+        aria-label="Minimize"
+        style={{ ...btnBase, background: minHover ? "rgba(255,255,255,0.10)" : "transparent" }}
+        onMouseEnter={() => setMinHover(true)}
+        onMouseLeave={() => setMinHover(false)}
+        onClick={() => win.minimize()}
+      >
+        &#x2212;
+      </button>
+      <button
+        aria-label="Maximize"
+        style={{ ...btnBase, background: maxHover ? "rgba(255,255,255,0.10)" : "transparent" }}
+        onMouseEnter={() => setMaxHover(true)}
+        onMouseLeave={() => setMaxHover(false)}
+        onClick={() => win.toggleMaximize()}
+      >
+        &#x25A1;
+      </button>
+      <button
+        aria-label="Close"
+        style={{ ...btnBase, background: closeHover ? "#c42b1c" : "transparent", color: closeHover ? "#fff" : "rgba(255,255,255,0.75)" }}
+        onMouseEnter={() => setCloseHover(true)}
+        onMouseLeave={() => setCloseHover(false)}
+        onClick={() => win.close()}
+      >
+        &#x2715;
+      </button>
     </div>
   );
 }
@@ -146,7 +168,7 @@ export function AppShell({ children, activeNav: controlledNav, onNavChange }: Ap
 flexShrink: 0,
         }}
       >
-        <TrafficLights />
+        <WindowControls />
       </div>
 
       {/* ── Body: sidebar + main ───────────────────────────────────────────── */}

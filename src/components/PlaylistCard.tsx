@@ -22,7 +22,8 @@ function gradientForId(id: string): string {
 // ── Timestamp formatter ───────────────────────────────────────────────────────
 
 function relativeTime(ts: number): string {
-  const diffMs = Date.now() - ts;
+  // ts is Unix seconds from the sidecar; Date.now() is ms
+  const diffMs = Date.now() - ts * 1000;
   const diffDays = Math.floor(diffMs / 86_400_000);
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Yesterday";
@@ -105,23 +106,17 @@ export function PlaylistCard({ playlist, onClick }: PlaylistCardProps) {
         >
           {playlist.name}
         </div>
-        <div
-          style={{
-            fontSize: 12,
-            color: "rgba(255,255,255,0.60)",
-            marginTop: 4,
-            display: "flex",
-            gap: 8,
-          }}
-        >
-          <span>{playlist.trackCount} tracks</span>
-          {playlist.cachedAt != null && (
-            <>
-              <span style={{ color: "rgba(255,255,255,0.25)" }}>·</span>
-              <span>{relativeTime(playlist.cachedAt)}</span>
-            </>
-          )}
-        </div>
+        {playlist.trackCount > 0 && (
+          <div
+            style={{
+              fontSize: 12,
+              color: "rgba(255,255,255,0.60)",
+              marginTop: 4,
+            }}
+          >
+            {playlist.trackCount} tracks
+          </div>
+        )}
       </div>
     </motion.div>
   );

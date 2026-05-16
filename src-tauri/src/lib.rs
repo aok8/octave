@@ -5,6 +5,10 @@ mod db;
 use auth::OAuthState;
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_deep_link::DeepLinkExt;
+use tauri_plugin_shell::ShellExt;
+
+// Keeps the sidecar child process alive for the lifetime of the app.
+struct SidecarHandle(std::sync::Mutex<Option<tauri_plugin_shell::process::CommandChild>>);
 
 // ── OAuth URL handler ─────────────────────────────────────────────────────────
 //
@@ -130,6 +134,87 @@ pub fn run() {
                     log::error!("DB init failed: {e}");
                 }
             });
+
+            // Spawn the Python FastAPI sidecar. externalBin bundles it but
+            // doesn't auto-start it — we must spawn explicitly.
+            let sidecar_port: u16 = 8765; // avoid collisions with common dev servers
+            std::env::set_var("OCTAVE_SIDECAR_PORT", sidecar_port.to_string());
+
+            // Kill any process already holding the sidecar port (e.g. a leftover
+            // sidecar from a previous dev-mode restart). Port-based kill is safe in
+            // production too: the single-instance plugin prevents duplicate app
+            // launches, so a lingering process would only exist after a crash.
+            #[cfg(target_os = "windows")]
+            {
+                if let Ok(out) = std::process::Command::new("netstat")
+                    .args(["-ano"])
+                    .output()
+                {
+                    let stdout = String::from_utf8_lossy(&out.stdout);
+                    let needle = format!(":{} ", sidecar_port);
+                    for line in stdout.lines() {
+                        if line.contains(&needle) && line.contains("LISTENING") {
+                            if let Some(pid) = line.split_whitespace().last() {
+                                let _ = std::process::Command::new("taskkill")
+                                    .args(["/F", "/PID", pid])
+                                    .output();
+                                log::info!("Killed stale sidecar process (PID {pid}) on port {sidecar_port}");
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Tell the sidecar where the shared SQLite DB lives (same path the
+            // Rust side uses). Must be set before spawn so the process inherits it.
+            if let Ok(data_dir) = app.path().app_data_dir() {
+                let db_path = data_dir.join("octave.db");
+                if let Some(p) = db_path.to_str() {
+                    std::env::set_var("OCTAVE_DB_PATH", p);
+                }
+            }
+
+            match app.shell().sidecar("main") {
+                Ok(cmd) => {
+                    match cmd.args([sidecar_port.to_string()]).spawn() {
+                        Ok((mut rx, child)) => {
+                            log::info!("Sidecar started on port {sidecar_port}");
+                            // Store handle so the process stays alive until the app exits
+                            app.manage(SidecarHandle(std::sync::Mutex::new(Some(child))));
+                            // Drain sidecar stdout/stderr so the pipe buffer never fills
+                            tauri::async_runtime::spawn(async move {
+                                use tauri_plugin_shell::process::CommandEvent;
+                                while let Some(event) = rx.recv().await {
+                                    match event {
+                                        CommandEvent::Stdout(b) => {
+                                            log::debug!("sidecar: {}", String::from_utf8_lossy(&b));
+                                        }
+                                        CommandEvent::Stderr(b) => {
+                                            log::warn!("sidecar stderr: {}", String::from_utf8_lossy(&b));
+                                        }
+                                        CommandEvent::Terminated(s) => {
+                                            log::info!("sidecar terminated: {s:?}");
+                                            break;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                            });
+                        }
+                        Err(e) => log::error!("Failed to spawn sidecar: {e}"),
+                    }
+                }
+                Err(e) => log::error!("Failed to create sidecar command: {e}"),
+            }
+
+            // In dev mode the installer never runs, so the octave:// scheme is
+            // not in the Windows registry. Register it at runtime so the current
+            // executable becomes the handler immediately.
+            #[cfg(debug_assertions)]
+            if let Err(e) = app.deep_link().register("octave") {
+                log::warn!("deep-link register failed (non-fatal in dev): {e}");
+            }
 
             // on_open_url fires when the app itself is launched with a deep-link
             // URL (e.g. first run, or macOS which always routes to running app).

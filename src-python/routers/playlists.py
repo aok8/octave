@@ -328,8 +328,19 @@ def get_playlist_tracks(
                         added_at = int(dt.timestamp())
                     except Exception:
                         added_at = None
-                upsert_track(conn, row)
-                upsert_playlist_track(conn, playlist_id, row["id"], position, added_at)
+                # Cache the track and its playlist membership.
+                # Wrapped in try/except so a schema mismatch or constraint
+                # error (e.g. DB migrations still running at startup) never
+                # prevents tracks from being delivered to the frontend.
+                try:
+                    upsert_track(conn, row)
+                    upsert_playlist_track(conn, playlist_id, row["id"], position, added_at)
+                except Exception as cache_exc:
+                    print(
+                        f"[tracks] warn: failed to cache track {row.get('id')}: "
+                        f"{type(cache_exc).__name__}: {cache_exc}",
+                        file=sys.stderr, flush=True,
+                    )
                 tracks_out.append(row)
                 position += 1
             if response.get("next"):
@@ -379,7 +390,10 @@ def get_playlist_tracks(
                 row["genres"] = genres_map[row["id"]]
 
         print(f"[tracks] returning {len(tracks_out)} spotify + {len(local_tracks_out)} local", file=sys.stderr, flush=True)
-        update_recently_used(conn, playlist_id)
+        try:
+            update_recently_used(conn, playlist_id)
+        except Exception as ru_exc:
+            print(f"[tracks] warn: recently_used update failed: {ru_exc}", file=sys.stderr, flush=True)
         return [_response_track(row) for row in tracks_out] + local_tracks_out
 
     except spotipy.SpotifyException as exc:

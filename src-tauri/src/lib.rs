@@ -127,13 +127,27 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(OAuthState::new())
         .setup(|app| {
-            // Initialize SQLite database
-            let db_handle = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                if let Err(e) = db::init_db(&db_handle).await {
-                    log::error!("DB init failed: {e}");
+            // Initialize SQLite database BEFORE spawning the sidecar so the
+            // Python process always finds a fully-migrated schema.  Blocking
+            // here is intentional — the sidecar must not serve its first
+            // request against a partially-migrated DB (that races in dev and
+            // fails reliably in production where the binary starts faster).
+            {
+                let (tx, rx) = std::sync::mpsc::channel::<()>();
+                let db_handle = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(e) = db::init_db(&db_handle).await {
+                        log::error!("DB init failed: {e}");
+                    }
+                    let _ = tx.send(());
+                });
+                // Wait up to 10 s for migrations to finish (they're fast;
+                // the timeout is just a safety net against a stalled FS).
+                match rx.recv_timeout(std::time::Duration::from_secs(10)) {
+                    Ok(()) => log::info!("DB migrations complete"),
+                    Err(_) => log::error!("DB init timed out — sidecar may see incomplete schema"),
                 }
-            });
+            }
 
             // Spawn the Python FastAPI sidecar. externalBin bundles it but
             // doesn't auto-start it — we must spawn explicitly.

@@ -106,15 +106,17 @@ export function PlaylistCard({ playlist, onClick }: PlaylistCardProps) {
         >
           {playlist.name}
         </div>
-        <div
-          style={{
-            fontSize: 12,
-            color: "rgba(255,255,255,0.60)",
-            marginTop: 4,
-          }}
-        >
-          {playlist.trackCount} tracks
-        </div>
+        {playlist.trackCount > 0 && (
+          <div
+            style={{
+              fontSize: 12,
+              color: "rgba(255,255,255,0.60)",
+              marginTop: 4,
+            }}
+          >
+            {playlist.trackCount} tracks
+          </div>
+        )}
       </div>
     </motion.div>
   );

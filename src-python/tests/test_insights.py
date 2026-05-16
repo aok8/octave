@@ -164,6 +164,106 @@ def test_response_shape(client: TestClient, tmp_db: str):
     assert isinstance(data["key_distribution"], dict)
 
 
+def test_synthetic_fraction_all_synthetic(client: TestClient, tmp_db: str):
+    """synthetic_fraction must be 1.0 when all tracks have the exact synthetic values."""
+    conn = sqlite3.connect(tmp_db)
+    pid = "pl_synth_all"
+    conn.execute("INSERT OR IGNORE INTO users (id, display_name) VALUES ('u1', 'Test')")
+    conn.execute(
+        "INSERT OR IGNORE INTO playlists (id, user_id, name, track_count) VALUES (?, 'u1', 'Synth PL', 3)",
+        (pid,),
+    )
+    for i in range(3):
+        tid = f"synth_all_{i}"
+        conn.execute(
+            "INSERT OR IGNORE INTO tracks (id, name, artist_names) VALUES (?, ?, '[]')",
+            (tid, f"Track {i}"),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)",
+            (pid, tid, i),
+        )
+        # Exact synthetic values: energy=0.5, valence=0.5, danceability=0.5, tempo=120.0
+        conn.execute(
+            """
+            INSERT OR IGNORE INTO audio_features
+                (track_id, energy, tempo, valence, danceability, acousticness,
+                 instrumentalness, speechiness, loudness, key, mode, time_signature)
+            VALUES (?, 0.5, 120.0, 0.5, 0.5, 0.3, 0.1, 0.05, -8.0, 0, 1, 4)
+            """,
+            (tid,),
+        )
+    conn.commit()
+    conn.close()
+
+    resp = client.get(f"/insights/{pid}")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    assert "synthetic_fraction" in data, "Missing field: synthetic_fraction"
+    assert data["synthetic_fraction"] == 1.0, (
+        f"Expected synthetic_fraction=1.0 for all-synthetic playlist, got {data['synthetic_fraction']}"
+    )
+
+
+def test_synthetic_fraction_partial(client: TestClient, tmp_db: str):
+    """synthetic_fraction is between 0 and 1 when only some tracks use synthetic values."""
+    conn = sqlite3.connect(tmp_db)
+    pid = "pl_synth_partial"
+    conn.execute("INSERT OR IGNORE INTO users (id, display_name) VALUES ('u1', 'Test')")
+    conn.execute(
+        "INSERT OR IGNORE INTO playlists (id, user_id, name, track_count) VALUES (?, 'u1', 'Partial PL', 4)",
+        (pid,),
+    )
+    # 2 synthetic tracks (energy=valence=danceability=0.5) and 2 real tracks
+    for i in range(4):
+        tid = f"synth_partial_{i}"
+        conn.execute(
+            "INSERT OR IGNORE INTO tracks (id, name, artist_names) VALUES (?, ?, '[]')",
+            (tid, f"Track {i}"),
+        )
+        conn.execute(
+            "INSERT OR IGNORE INTO playlist_tracks (playlist_id, track_id, position) VALUES (?, ?, ?)",
+            (pid, tid, i),
+        )
+        if i < 2:
+            # Synthetic values
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO audio_features
+                    (track_id, energy, tempo, valence, danceability, acousticness,
+                     instrumentalness, speechiness, loudness, key, mode, time_signature)
+                VALUES (?, 0.5, 120.0, 0.5, 0.5, 0.3, 0.1, 0.05, -8.0, 0, 1, 4)
+                """,
+                (tid,),
+            )
+        else:
+            # Real values — distinct from synthetic fingerprint
+            conn.execute(
+                """
+                INSERT OR IGNORE INTO audio_features
+                    (track_id, energy, tempo, valence, danceability, acousticness,
+                     instrumentalness, speechiness, loudness, key, mode, time_signature)
+                VALUES (?, 0.8, 135.0, 0.7, 0.85, 0.1, 0.0, 0.03, -5.0, 2, 1, 4)
+                """,
+                (tid,),
+            )
+    conn.commit()
+    conn.close()
+
+    resp = client.get(f"/insights/{pid}")
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    assert "synthetic_fraction" in data, "Missing field: synthetic_fraction"
+    frac = data["synthetic_fraction"]
+    assert 0.0 < frac < 1.0, (
+        f"Expected 0 < synthetic_fraction < 1 for partial playlist, got {frac}"
+    )
+    # 2 out of 4 tracks are synthetic → 0.5
+    assert abs(frac - 0.5) < 1e-9, f"Expected synthetic_fraction=0.5, got {frac}"
+
+
 def test_advanced_insights_fields(client: TestClient, tmp_db: str):
     """AC-S14-01 — timeline entries include tempo, popularity, key; key_distribution present."""
     # Seed with distinct tempo/key values per track

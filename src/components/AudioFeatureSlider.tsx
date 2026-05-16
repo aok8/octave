@@ -157,6 +157,7 @@ interface AudioFeatureSliderProps {
   max?: number;
   onChange: (v: number) => void;
   label?: string;
+  median?: number;
 }
 
 export function AudioFeatureSlider({
@@ -166,6 +167,7 @@ export function AudioFeatureSlider({
   max: maxOverride,
   onChange,
   label: labelOverride,
+  median,
 }: AudioFeatureSliderProps) {
   ensureSliderStyles();
   const uid = useId();
@@ -197,9 +199,22 @@ export function AudioFeatureSlider({
             fontSize: 13,
             color: "rgba(255,255,255,0.60)",
             cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            gap: 0,
           }}
         >
           {label}
+          {median !== undefined && (
+            <span
+              data-testid={`slider-median-${feature}`}
+              style={{ color: "rgba(255,255,255,0.35)", marginLeft: 4 }}
+            >
+              {feature === "tempo"
+                ? `· ${Math.round(median)} BPM`
+                : `· ${median.toFixed(2)}`}
+            </span>
+          )}
         </label>
         <span
           style={{

@@ -606,6 +606,7 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
   const [trackMap, setTrackMap] = useState<Record<string, Track>>({});
   const [originalTrackIds, setOriginalTrackIds] = useState<string[]>([]);
   const [audioFeatures, setAudioFeatures] = useState<AudioFeatures[]>([]);
+  const [loadingFeatures, setLoadingFeatures] = useState(false);
   const [showExport, setShowExport] = useState(false);
 
   // Debounce ref
@@ -675,6 +676,23 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
       setError("Could not load playlist data. Please try again.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  // ── Force-refresh audio features ─────────────────────────────────────────
+
+  async function refreshAudioFeatures() {
+    if (loadingFeatures || originalTrackIds.length === 0) return;
+    setLoadingFeatures(true);
+    try {
+      const features = await invoke<AudioFeatures[]>("fetch_audio_features", {
+        trackIds: originalTrackIds,
+      });
+      setAudioFeatures(features);
+    } catch {
+      // silently ignore — features stay as-is
+    } finally {
+      setLoadingFeatures(false);
     }
   }
 
@@ -785,6 +803,21 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
 
   // ── Derived display data ──────────────────────────────────────────────────
 
+  // Compute medians from loaded audio features (undefined when no features)
+  const featureMedians = useMemo(() => {
+    if (audioFeatures.length === 0) return null;
+    const pick = (key: keyof AudioFeatures) =>
+      audioFeatures.map((f) => f[key] as number).filter((v) => typeof v === "number");
+    return {
+      energy: median(pick("energy")),
+      tempo: median(pick("tempo")),
+      instrumentalness: median(pick("instrumentalness")),
+      acousticness: median(pick("acousticness")),
+      danceability: median(pick("danceability")),
+      valence: median(pick("valence")),
+    };
+  }, [audioFeatures]);
+
   const genreData = buildGenreData(
     originalTrackIds,
     trackMap,
@@ -858,7 +891,7 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
             ←
           </button>
         )}
-        <div>
+        <div style={{ flex: 1 }}>
           <h1
             style={{
               fontSize: 20,
@@ -876,6 +909,23 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
             </p>
           )}
         </div>
+        <button
+          data-testid="refresh-audio-features-btn"
+          onClick={refreshAudioFeatures}
+          disabled={loadingFeatures}
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.12)",
+            borderRadius: 6,
+            padding: "4px 10px",
+            fontSize: 12,
+            color: "rgba(255,255,255,0.55)",
+            cursor: loadingFeatures ? "default" : "pointer",
+            fontFamily: "inherit",
+          }}
+        >
+          {loadingFeatures ? "Refreshing…" : "↺ Refresh"}
+        </button>
       </div>
 
       {/* ── Body ──────────────────────────────────────────────────────────── */}
@@ -926,11 +976,13 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
               feature="energy"
               value={state.sliders.energy}
               onChange={(v) => handleSliderChange("energy", v)}
+              median={featureMedians?.energy}
             />
             <AudioFeatureSlider
               feature="tempo"
               value={state.sliders.tempo}
               onChange={(v) => handleSliderChange("tempo", v)}
+              median={featureMedians?.tempo}
             />
             <AudioFeatureSlider
               feature="energy"
@@ -944,21 +996,25 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
               feature="instrumentalness"
               value={state.sliders.instrumentalness}
               onChange={(v) => handleSliderChange("instrumentalness", v)}
+              median={featureMedians?.instrumentalness}
             />
             <AudioFeatureSlider
               feature="acousticness"
               value={state.sliders.acousticness}
               onChange={(v) => handleSliderChange("acousticness", v)}
+              median={featureMedians?.acousticness}
             />
             <AudioFeatureSlider
               feature="danceability"
               value={state.sliders.danceability}
               onChange={(v) => handleSliderChange("danceability", v)}
+              median={featureMedians?.danceability}
             />
             <AudioFeatureSlider
               feature="valence"
               value={state.sliders.valence}
               onChange={(v) => handleSliderChange("valence", v)}
+              median={featureMedians?.valence}
             />
           </div>
 

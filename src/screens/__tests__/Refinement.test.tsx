@@ -271,4 +271,86 @@ describe("Refinement screen", () => {
     expect(screen.getByTestId("sliders-panel")).toBeInTheDocument();
     expect(screen.getByTestId("donut-panel")).toBeInTheDocument();
   });
+
+  // ── Slider median labels ─────────────────────────────────────────────────
+
+  it("shows energy median in slider label when audio features are loaded", async () => {
+    // Override fetch_audio_features to return real data
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "fetch_playlist_tracks") return Promise.resolve(MOCK_TRACKS);
+      if (cmd === "fetch_audio_features") {
+        return Promise.resolve(
+          MOCK_TRACK_IDS.map((id, i) => ({
+            trackId: id,
+            energy: 0.5 + i * 0.01,
+            tempo: 120 + i,
+            valence: 0.6,
+            danceability: 0.7,
+            acousticness: 0.3,
+            instrumentalness: 0.1,
+            speechiness: 0.05,
+            loudness: -8,
+          }))
+        );
+      }
+      if (cmd === "refine_playlist") {
+        return Promise.resolve({ orderedTrackIds: MOCK_TRACK_IDS, removedTrackIds: [] });
+      }
+      return Promise.resolve(null);
+    });
+
+    await renderRefinement();
+
+    // The median element for energy should be present
+    const medianEl = screen.getByTestId("slider-median-energy");
+    expect(medianEl).toBeInTheDocument();
+    // It should contain a decimal value
+    expect(medianEl.textContent).toMatch(/·\s*0\.\d+/);
+  });
+
+  // ── Force-refresh button ─────────────────────────────────────────────────
+
+  it("renders the refresh audio features button", async () => {
+    await renderRefinement();
+    expect(screen.getByTestId("refresh-audio-features-btn")).toBeInTheDocument();
+  });
+
+  it("refresh button re-fetches audio features", async () => {
+    await renderRefinement();
+
+    // Clear calls from the initial load
+    mockInvoke.mockClear();
+
+    // Override to return features on next call
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "fetch_audio_features") {
+        return Promise.resolve(
+          MOCK_TRACK_IDS.map((id) => ({
+            trackId: id,
+            energy: 0.8,
+            tempo: 130,
+            valence: 0.5,
+            danceability: 0.65,
+            acousticness: 0.2,
+            instrumentalness: 0.05,
+            speechiness: 0.04,
+            loudness: -6,
+          }))
+        );
+      }
+      return Promise.resolve(null);
+    });
+
+    const refreshBtn = screen.getByTestId("refresh-audio-features-btn");
+    fireEvent.click(refreshBtn);
+
+    await act(async () => {
+      await vi.runAllTimersAsync();
+    });
+
+    const featureCalls = mockInvoke.mock.calls.filter(
+      (c) => c[0] === "fetch_audio_features"
+    );
+    expect(featureCalls.length).toBeGreaterThanOrEqual(1);
+  });
 });

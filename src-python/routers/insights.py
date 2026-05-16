@@ -81,12 +81,35 @@ def get_insights(
         # Pitch class → note name (C major scale naming)
         _KEY_NAMES = ["C", "C♯", "D", "D♯", "E", "F", "F♯", "G", "G♯", "A", "A♯", "B"]
 
+        # Synthetic feature signature — matches _synthetic_features() fixed values
+        _SYNTHETIC_ENERGY = 0.5
+        _SYNTHETIC_VALENCE = 0.5
+        _SYNTHETIC_DANCEABILITY = 0.5
+
+        def _infer_features_source(feats: dict) -> str:
+            """Infer the source of audio features.
+
+            Checks the ``source`` column if present; otherwise detects synthetic
+            data by matching the fixed mid-range values returned by
+            ``_synthetic_features()``.
+            """
+            if "source" in feats and feats["source"]:
+                return feats["source"]
+            e = feats.get("energy")
+            v = feats.get("valence")
+            d = feats.get("danceability")
+            if e == _SYNTHETIC_ENERGY and v == _SYNTHETIC_VALENCE and d == _SYNTHETIC_DANCEABILITY:
+                return "synthetic"
+            # No recognised source column and values don't match synthetic → real data
+            return "spotify"
+
         # --- Build timeline + genre assignment ---
         timeline = []
         genre_counts: dict[str, int] = {}
         # subgenres: genre → set of subgenre strings (v1: empty since no artist data)
         genre_subgenres: dict[str, set] = {}
         key_counts: dict[str, int] = {}
+        synthetic_count = 0
 
         for track in tracks:
             tid = track["id"]
@@ -117,6 +140,11 @@ def get_insights(
                 key_name = _KEY_NAMES[int(raw_key)] + mode_suffix
                 key_counts[key_name] = key_counts.get(key_name, 0) + 1
 
+            # Determine features source (synthetic / rapidapi / spotify)
+            features_source = _infer_features_source(feats) if feats else "synthetic"
+            if features_source == "synthetic":
+                synthetic_count += 1
+
             # Parse artist_names — stored as JSON string in DB
             raw_artists = track.get("artist_names", [])
             if isinstance(raw_artists, str):
@@ -140,6 +168,7 @@ def get_insights(
                     "popularity": track.get("popularity"),
                     "key": key_name,
                     "genre": genre,
+                    "features_source": features_source,
                 }
             )
 
@@ -166,12 +195,15 @@ def get_insights(
         # Sort key_distribution by note name for deterministic ordering
         key_distribution = dict(sorted(key_counts.items()))
 
+        synthetic_fraction = synthetic_count / total_tracks if total_tracks > 0 else 0.0
+
         return {
             "playlist_id": playlist_id,
             "genre_breakdown": genre_breakdown,
             "timeline": timeline,
             "total_tracks": total_tracks,
             "key_distribution": key_distribution,
+            "synthetic_fraction": synthetic_fraction,
         }
 
     finally:

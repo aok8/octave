@@ -31,6 +31,7 @@ interface TimelineEntry {
   popularity: number | null;
   key: string | null;
   genre: string;
+  features_source?: "synthetic" | "rapidapi" | "spotify";
 }
 
 interface InsightsResponse {
@@ -39,6 +40,7 @@ interface InsightsResponse {
   timeline: TimelineEntry[];
   total_tracks: number;
   key_distribution: Record<string, number>;
+  synthetic_fraction: number;
 }
 
 // ── Insights screen ───────────────────────────────────────────────────────────
@@ -195,6 +197,25 @@ export function Insights({ playlistId, onBack, onRefine }: InsightsProps) {
           </button>
         )}
       </div>
+
+      {/* ── Synthetic data notice ───────────────────────────────────────────── */}
+      {!loading && !error && insights && (insights.synthetic_fraction ?? 0) > 0 && (
+        <div
+          data-testid="insights-synthetic-notice"
+          style={{
+            background: "rgba(251,191,36,0.12)",
+            border: "1px solid rgba(251,191,36,0.3)",
+            color: "#fbbf24",
+            padding: "10px 14px",
+            borderRadius: 6,
+            fontSize: 13,
+          }}
+        >
+          {insights.synthetic_fraction === 1.0
+            ? "Audio features are estimated — add a RapidAPI key in Settings for full analysis."
+            : `Some tracks (${Math.round(insights.synthetic_fraction * insights.total_tracks)}) use estimated audio features. Add a RapidAPI key in Settings.`}
+        </div>
+      )}
 
       {/* ── Content ─────────────────────────────────────────────────────────── */}
       {loading ? (

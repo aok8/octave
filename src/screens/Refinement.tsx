@@ -630,11 +630,12 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
 
       const map: Record<string, Track> = {};
       for (const t of tracks) {
-        map[t.id] = t;
+        if (t.id != null) map[t.id] = t;
       }
       setTrackMap(map);
 
-      const ids = tracks.map((t) => t.id);
+      // Exclude local tracks (null id) — they have no audio features
+      const ids = tracks.map((t) => t.id).filter((id): id is string => id != null);
       setOriginalTrackIds(ids);
 
       // Fetch audio features — fall back to empty on failure so the UI still loads
@@ -711,10 +712,7 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
     addConstraint("popularity", "popularity", 0, 100);
 
     try {
-      const result = await invoke<{
-        orderedTrackIds: string[];
-        removedTrackIds: string[];
-      }>("refine_playlist", {
+      const raw = await invoke<Record<string, unknown>>("refine_playlist", {
         payload: {
           playlist_id: playlistId,
           track_ids: trackIds,
@@ -725,10 +723,11 @@ export function Refinement({ playlistId = "pl_01", onBack, onExport }: Refinemen
           },
         },
       });
+      // Python returns snake_case; handle both for safety
       dispatch({
         type: "SET_REFINE_RESULT",
-        orderedTrackIds: result.orderedTrackIds,
-        removedTrackIds: result.removedTrackIds,
+        orderedTrackIds: ((raw.orderedTrackIds ?? raw.ordered_track_ids ?? []) as string[]),
+        removedTrackIds: ((raw.removedTrackIds ?? raw.removed_track_ids ?? []) as string[]),
       });
     } catch {
       // refine_playlist not available yet — use identity ordering

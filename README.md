@@ -18,8 +18,8 @@ A Tauri + React desktop app for Spotify playlist analysis and curation.
 | Playlist library browser | ✅ |
 | Playlist Insights — genre breakdown, audio flow, tempo map, key distribution | ✅ |
 | Audio analysis via RapidAPI SoundNet (requires free API key) | ✅ partial coverage |
-| Song-based discovery (similarity recommendations) | ✅ |
-| AI playlist prompt | ✅ |
+| Song-based discovery (similarity recommendations) | disabled |
+| AI playlist prompt | disabled |
 | Export playlist to Spotify | ✅ |
 | Refine Playlist (filter/boost by audio features) | disabled |
 

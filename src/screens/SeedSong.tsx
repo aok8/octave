@@ -391,7 +391,7 @@ export function SeedSong({ onBack, onDiscover }: SeedSongProps) {
             <div style={{ marginTop: 20 }}>
               <button
                 data-testid="seed-song-discover-btn"
-                onClick={() => onDiscover(selectedTrack.id)}
+                onClick={() => onDiscover(selectedTrack.id!)}
                 style={{
                   padding: "11px 24px",
                   borderRadius: 8,

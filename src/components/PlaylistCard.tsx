@@ -19,19 +19,6 @@ function gradientForId(id: string): string {
   return FALLBACK_GRADIENTS[hash % FALLBACK_GRADIENTS.length];
 }
 
-// ── Timestamp formatter ───────────────────────────────────────────────────────
-
-function relativeTime(ts: number): string {
-  // ts is Unix seconds from the sidecar; Date.now() is ms
-  const diffMs = Date.now() - ts * 1000;
-  const diffDays = Math.floor(diffMs / 86_400_000);
-  if (diffDays === 0) return "Today";
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  return `${Math.floor(diffDays / 30)}mo ago`;
-}
-
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface PlaylistCardProps {

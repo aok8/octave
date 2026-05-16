@@ -71,11 +71,19 @@ const EMPTY_CARD: React.CSSProperties = {
   borderRadius: 8,
 };
 
+// Chunk size matches RapidAPI's 5 req/s rate limit — each chunk fires 5
+// parallel requests, then we wait 1 s before sending the next chunk.
+const RAPIDAPI_CHUNK_SIZE = 5;
+const RAPIDAPI_CHUNK_DELAY_MS = 1000;
+
 export function Insights({ playlistId, onBack, onRefine }: InsightsProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [insights, setInsights] = useState<InsightsResponse | null>(null);
   const [audioFeatures, setAudioFeatures] = useState<AudioFeatures[]>([]);
+  // Progress state for the background audio-feature fetch
+  const [fetchedCount, setFetchedCount] = useState(0);
+  const [totalToFetch, setTotalToFetch] = useState(0);
 
   useEffect(() => {
     if (playlistId) loadInsights();
@@ -85,23 +93,56 @@ export function Insights({ playlistId, onBack, onRefine }: InsightsProps) {
   async function loadInsights() {
     setLoading(true);
     setError(null);
+    setFetchedCount(0);
+    setTotalToFetch(0);
     try {
+      // Step 1 — fetch insights immediately (fast: reads whatever is in the
+      // DB cache).  Show charts right away even if features are synthetic.
       const data = await invoke<InsightsResponse>("fetch_insights", { playlistId });
       setInsights(data);
+      setLoading(false);
 
-      // Audio features for the TrackCard enrichment (supplemental, non-fatal)
+      // Step 2 — fetch audio features in background, 5 tracks per chunk to
+      // stay within the RapidAPI 5 req/s rate limit.  Refresh insights after
+      // every chunk so charts update progressively as data arrives.
       const trackIds = data.timeline.map((t) => t.track_id);
-      if (trackIds.length > 0) {
+      if (trackIds.length === 0) return;
+
+      setTotalToFetch(trackIds.length);
+
+      const chunks: string[][] = [];
+      for (let i = 0; i < trackIds.length; i += RAPIDAPI_CHUNK_SIZE) {
+        chunks.push(trackIds.slice(i, i + RAPIDAPI_CHUNK_SIZE));
+      }
+
+      let accumulated: AudioFeatures[] = [];
+      for (let ci = 0; ci < chunks.length; ci++) {
         try {
-          const features = await invoke<AudioFeatures[]>("fetch_audio_features", { trackIds });
-          setAudioFeatures(features);
+          const chunkFeatures = await invoke<AudioFeatures[]>("fetch_audio_features", {
+            trackIds: chunks[ci],
+          });
+          accumulated = [...accumulated, ...chunkFeatures];
+          setAudioFeatures([...accumulated]);
+          setFetchedCount(Math.min((ci + 1) * RAPIDAPI_CHUNK_SIZE, trackIds.length));
+
+          // Refresh insights so charts reflect features now in the DB
+          const refreshed = await invoke<InsightsResponse>("fetch_insights", { playlistId });
+          setInsights(refreshed);
         } catch {
-          // non-fatal
+          // non-fatal — keep going with remaining chunks
+        }
+
+        // Rate-limit delay between chunks (skip after the last one)
+        if (ci < chunks.length - 1) {
+          await new Promise<void>((res) => setTimeout(res, RAPIDAPI_CHUNK_DELAY_MS));
         }
       }
+
+      // Final refresh to capture any DB writes that landed after the loop
+      setFetchedCount(trackIds.length);
+      setTotalToFetch(0); // hides the progress banner
     } catch (err) {
       setError("Could not load insights. Check your connection and try again.");
-    } finally {
       setLoading(false);
     }
   }
@@ -198,8 +239,41 @@ export function Insights({ playlistId, onBack, onRefine }: InsightsProps) {
         )}
       </div>
 
+      {/* ── Audio analysis progress banner ──────────────────────────────────── */}
+      {!loading && !error && totalToFetch > 0 && (
+        <div
+          data-testid="insights-fetch-progress"
+          style={{
+            background: "rgba(29,185,255,0.08)",
+            border: "1px solid rgba(29,185,255,0.25)",
+            color: "#1DB9FF",
+            padding: "10px 14px",
+            borderRadius: 6,
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              display: "inline-block",
+              width: 12,
+              height: 12,
+              borderRadius: "50%",
+              border: "2px solid rgba(29,185,255,0.3)",
+              borderTopColor: "#1DB9FF",
+              animation: "spin 0.9s linear infinite",
+            }}
+          />
+          Analyzing audio… {fetchedCount} / {totalToFetch} tracks — charts update as data arrives
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      )}
+
       {/* ── Synthetic data notice ───────────────────────────────────────────── */}
-      {!loading && !error && insights && (insights.synthetic_fraction ?? 0) > 0 && (
+      {!loading && !error && totalToFetch === 0 && insights && (insights.synthetic_fraction ?? 0) > 0 && (
         <div
           data-testid="insights-synthetic-notice"
           style={{

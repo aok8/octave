@@ -197,7 +197,10 @@ def get_features_batch(track_ids: list, api_key: str) -> list:
     }
 
     results: list = []
-    max_workers = min(len(track_ids), 10)
+    # Cap at 5 concurrent workers — RapidAPI rate-limits to 5 req/s.
+    # Firing more simultaneously causes 429 responses that silently fall
+    # back to synthetic values.
+    max_workers = min(len(track_ids), 5)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
             executor.submit(_fetch_single, tid, headers): tid

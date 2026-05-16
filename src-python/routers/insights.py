@@ -117,10 +117,22 @@ def get_insights(
                 key_name = _KEY_NAMES[int(raw_key)] + mode_suffix
                 key_counts[key_name] = key_counts.get(key_name, 0) + 1
 
+            # Parse artist_names — stored as JSON string in DB
+            raw_artists = track.get("artist_names", [])
+            if isinstance(raw_artists, str):
+                try:
+                    import json as _j
+                    raw_artists = _j.loads(raw_artists)
+                except Exception:
+                    raw_artists = []
+
             timeline.append(
                 {
                     "position": pos,
                     "track_id": tid,
+                    "track_name": track.get("name", tid),
+                    "artist_names": raw_artists,
+                    "album_art_url": track.get("album_art_url"),
                     "energy": feats.get("energy"),
                     "valence": feats.get("valence"),
                     "danceability": feats.get("danceability"),

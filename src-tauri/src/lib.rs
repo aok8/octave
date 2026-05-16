@@ -259,6 +259,10 @@ pub fn run() {
             commands::ai_cmd::generate_ai_playlist,
             commands::ai_cmd::set_ai_key,
             commands::ai_cmd::get_ai_status,
+            commands::ai_cmd::save_rapidapi_key,
+            commands::ai_cmd::get_rapidapi_status,
+            commands::ai_cmd::delete_rapidapi_key,
+            commands::ai_cmd::test_rapidapi_key,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -9,12 +9,13 @@ GET /tracks/audio-features?track_ids=id1,id2,...&access_token=<token>
 """
 
 import time
-from typing import List
+from typing import List, Optional
 
 import spotipy
 from fastapi import APIRouter, HTTPException, Query
 
-from db import get_cached_features, get_db, upsert_audio_features
+import rapidapi_client
+from db import get_ai_config, get_cached_features, get_db, upsert_audio_features
 from spotify_client import get_client
 
 router = APIRouter()
@@ -87,6 +88,7 @@ def _response_features(row: dict) -> dict:
 def get_audio_features(
     track_ids: str = Query(..., description="Comma-separated Spotify track IDs"),
     access_token: str = Query(..., description="Spotify access token"),
+    rapidapi_key: Optional[str] = Query(None, description="RapidAPI key for SoundNet fallback"),
 ):
     """Return audio features for the requested track IDs.
 
@@ -102,6 +104,12 @@ def get_audio_features(
 
     conn = get_db()
     try:
+        # Try to read stored key from DB if not passed in query
+        if not rapidapi_key:
+            stored_key = get_ai_config(conn, "rapidapi_key")
+            if stored_key:
+                rapidapi_key = stored_key
+
         cached_map = get_cached_features(conn, ids)
         uncached_ids = [tid for tid in ids if tid not in cached_map]
 
@@ -128,8 +136,23 @@ def get_audio_features(
                             detail="Invalid or expired Spotify token",
                         )
                     if status in (400, 403):
-                        # Spotify removed this endpoint for most apps — return synthetic values
-                        results = [_synthetic_features(tid) for tid in batch]
+                        # Spotify removed this endpoint for most apps.
+                        # Try RapidAPI (SoundNet) first; fall back to synthetic values.
+                        if rapidapi_key:
+                            rapid_results = rapidapi_client.get_features_batch(batch, rapidapi_key)
+                            fetched_ids = set()
+                            for row in rapid_results:
+                                upsert_audio_features(conn, row)
+                                cached_map[row["track_id"]] = row
+                                fetched_ids.add(row["track_id"])
+                            # For any track still missing, use synthetic values
+                            results = [
+                                _synthetic_features(tid)
+                                for tid in batch
+                                if tid not in fetched_ids
+                            ]
+                        else:
+                            results = [_synthetic_features(tid) for tid in batch]
                     else:
                         raise HTTPException(status_code=status, detail=str(exc))
                 except Exception as exc:

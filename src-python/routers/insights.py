@@ -17,7 +17,7 @@ from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
-from db import get_cached_features, get_cached_tracks, get_db, log_interaction
+from db import get_ai_config, get_cached_features, get_cached_tracks, get_db, log_interaction
 from genre import GENRE_COLORS, classify_genre
 
 router = APIRouter()
@@ -197,6 +197,11 @@ def get_insights(
 
         synthetic_fraction = synthetic_count / total_tracks if total_tracks > 0 else 0.0
 
+        # Let the frontend know whether a RapidAPI key is configured so it can
+        # show the right message: "add a key" vs "some tracks not in catalog".
+        rapidapi_key = get_ai_config(conn, "rapidapi_key")
+        rapidapi_configured = bool(rapidapi_key)
+
         return {
             "playlist_id": playlist_id,
             "genre_breakdown": genre_breakdown,
@@ -204,6 +209,7 @@ def get_insights(
             "total_tracks": total_tracks,
             "key_distribution": key_distribution,
             "synthetic_fraction": synthetic_fraction,
+            "rapidapi_configured": rapidapi_configured,
         }
 
     finally:

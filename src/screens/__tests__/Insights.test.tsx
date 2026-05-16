@@ -37,7 +37,7 @@ const mockInvoke = vi.mocked(invoke);
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeInsightsResponse(syntheticFraction: number) {
+function makeInsightsResponse(syntheticFraction: number, rapidapiConfigured = false) {
   return {
     playlist_id: "pl_test",
     total_tracks: 4,
@@ -61,6 +61,7 @@ function makeInsightsResponse(syntheticFraction: number) {
     ],
     key_distribution: { C: 1 },
     synthetic_fraction: syntheticFraction,
+    rapidapi_configured: rapidapiConfigured,
   };
 }
 
@@ -104,6 +105,44 @@ describe("Insights synthetic data notice", () => {
 
     const notice = screen.getByTestId("insights-synthetic-notice");
     expect(notice.textContent).toMatch(/estimated/i);
+  });
+
+  it("shows catalog-gap message (not Settings prompt) when RapidAPI key is configured and all features are synthetic", async () => {
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "fetch_insights") return Promise.resolve(makeInsightsResponse(1.0, true));
+      if (cmd === "fetch_audio_features") return Promise.resolve([]);
+      return Promise.resolve(null);
+    });
+
+    render(<Insights playlistId="pl_test" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("insights-synthetic-notice")).toBeInTheDocument();
+    });
+
+    const notice = screen.getByTestId("insights-synthetic-notice");
+    expect(notice.textContent).toMatch(/estimated/i);
+    expect(notice.textContent).toMatch(/catalog/i);
+    expect(notice.textContent).not.toMatch(/Settings/i);
+  });
+
+  it("shows catalog-gap message (not Settings prompt) when RapidAPI key is configured and some features are synthetic", async () => {
+    mockInvoke.mockImplementation((cmd: string) => {
+      if (cmd === "fetch_insights") return Promise.resolve(makeInsightsResponse(0.5, true));
+      if (cmd === "fetch_audio_features") return Promise.resolve([]);
+      return Promise.resolve(null);
+    });
+
+    render(<Insights playlistId="pl_test" />);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("insights-synthetic-notice")).toBeInTheDocument();
+    });
+
+    const notice = screen.getByTestId("insights-synthetic-notice");
+    expect(notice.textContent).toMatch(/estimated/i);
+    expect(notice.textContent).toMatch(/catalog/i);
+    expect(notice.textContent).not.toMatch(/Settings/i);
   });
 
   it("does NOT show notice when synthetic_fraction is 0", async () => {

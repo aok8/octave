@@ -41,6 +41,8 @@ interface InsightsResponse {
   total_tracks: number;
   key_distribution: Record<string, number>;
   synthetic_fraction: number;
+  /** True when a RapidAPI key is saved in settings. */
+  rapidapi_configured: boolean;
 }
 
 // ── Insights screen ───────────────────────────────────────────────────────────
@@ -294,9 +296,15 @@ export function Insights({ playlistId, onBack, onRefine }: InsightsProps) {
             fontSize: 13,
           }}
         >
-          {insights.synthetic_fraction === 1.0
-            ? "Audio features are estimated — add a RapidAPI key in Settings for full analysis."
-            : `Some tracks (${Math.round(insights.synthetic_fraction * insights.total_tracks)}) use estimated audio features. Add a RapidAPI key in Settings.`}
+          {insights.rapidapi_configured
+            ? /* Key is set — these tracks just aren't in SoundNet's catalog */
+              insights.synthetic_fraction === 1.0
+              ? "Audio features are estimated — these tracks aren't in the SoundNet catalog yet."
+              : `Some tracks (${Math.round(insights.synthetic_fraction * insights.total_tracks)}) use estimated audio features — not found in the SoundNet catalog.`
+            : /* No key configured — prompt to add one */
+              insights.synthetic_fraction === 1.0
+              ? "Audio features are estimated — add a RapidAPI key in Settings for full analysis."
+              : `Some tracks (${Math.round(insights.synthetic_fraction * insights.total_tracks)}) use estimated audio features. Add a RapidAPI key in Settings.`}
         </div>
       )}
 

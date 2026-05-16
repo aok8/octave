@@ -171,7 +171,7 @@ def _fetch_single(track_id: str, headers: dict) -> Optional[dict]:
             response = requests.get(
                 f"https://{RAPIDAPI_HOST}/pktx/spotify/{track_id}",
                 headers=headers,
-                timeout=10,
+                timeout=5,
             )
             if response.status_code == 429:
                 if attempt == 0:

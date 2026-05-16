@@ -49,6 +49,20 @@ const MOCK_RECOMMENDATIONS: Track[] = [
   },
 ];
 
+// Raw snake_case shape as returned by the Rust IPC command
+const MOCK_SIMILAR_TRACKS_RAW = [
+  {
+    track_id: "sim-1",
+    score: 0.87,
+    matching_features: ["energy", "valence"],
+  },
+  {
+    track_id: "sim-2",
+    score: 0.72,
+    matching_features: ["danceability"],
+  },
+];
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -65,10 +79,11 @@ describe("SeedSong — Discover button (R-11)", () => {
   it("shows Discover button after a track is selected and onDiscover prop is provided", async () => {
     const onDiscover = vi.fn();
 
-    // search_tracks → results; fetch_recommendations → recs
+    // search_tracks → results; fetch_recommendations → recs; fetch_similar_tracks → []
     mockInvoke
       .mockResolvedValueOnce(MOCK_SEARCH_RESULTS) // search_tracks
-      .mockResolvedValueOnce(MOCK_RECOMMENDATIONS); // fetch_recommendations
+      .mockResolvedValueOnce(MOCK_RECOMMENDATIONS) // fetch_recommendations
+      .mockResolvedValueOnce([]); // fetch_similar_tracks
 
     render(<SeedSong onDiscover={onDiscover} />);
 
@@ -100,7 +115,8 @@ describe("SeedSong — Discover button (R-11)", () => {
 
     mockInvoke
       .mockResolvedValueOnce(MOCK_SEARCH_RESULTS) // search_tracks
-      .mockResolvedValueOnce(MOCK_RECOMMENDATIONS); // fetch_recommendations
+      .mockResolvedValueOnce(MOCK_RECOMMENDATIONS) // fetch_recommendations
+      .mockResolvedValueOnce([]); // fetch_similar_tracks
 
     render(<SeedSong onDiscover={onDiscover} />);
 
@@ -127,7 +143,8 @@ describe("SeedSong — Discover button (R-11)", () => {
   it("does not show Discover button when onDiscover prop is not provided", async () => {
     mockInvoke
       .mockResolvedValueOnce(MOCK_SEARCH_RESULTS)
-      .mockResolvedValueOnce(MOCK_RECOMMENDATIONS);
+      .mockResolvedValueOnce(MOCK_RECOMMENDATIONS)
+      .mockResolvedValueOnce([]); // fetch_similar_tracks
 
     render(<SeedSong />);
 
@@ -146,5 +163,69 @@ describe("SeedSong — Discover button (R-11)", () => {
     await act(async () => {});
 
     expect(screen.queryByTestId("seed-song-discover-btn")).not.toBeInTheDocument();
+  });
+});
+
+// ── Helper: select a track and flush all async work ───────────────────────────
+
+async function selectTrack(query = "Miles", trackName = "Blue in Green") {
+  const searchInput = screen.getByRole("textbox", { name: /search tracks/i });
+  fireEvent.change(searchInput, { target: { value: query } });
+
+  await act(async () => {
+    vi.advanceTimersByTime(400);
+  });
+  await act(async () => {});
+
+  const trackCard = screen.getByText(trackName);
+  await act(async () => {
+    fireEvent.click(trackCard);
+  });
+  await act(async () => {});
+}
+
+// ── Similar Tracks tests ──────────────────────────────────────────────────────
+
+describe("SeedSong — Similar Tracks (Sprint 3)", () => {
+  it("fetches similar tracks when seed track selected", async () => {
+    // mockInvoke call order: search_tracks, then Promise.allSettled([fetch_recommendations, fetch_similar_tracks])
+    mockInvoke
+      .mockResolvedValueOnce(MOCK_SEARCH_RESULTS)   // search_tracks
+      .mockResolvedValueOnce(MOCK_RECOMMENDATIONS)   // fetch_recommendations
+      .mockResolvedValueOnce(MOCK_SIMILAR_TRACKS_RAW); // fetch_similar_tracks
+
+    render(<SeedSong />);
+    await selectTrack();
+
+    expect(screen.getByTestId("similar-track-sim-1")).toBeInTheDocument();
+    expect(screen.getByTestId("similar-track-sim-2")).toBeInTheDocument();
+  });
+
+  it("shows matching feature chips", async () => {
+    mockInvoke
+      .mockResolvedValueOnce(MOCK_SEARCH_RESULTS)
+      .mockResolvedValueOnce(MOCK_RECOMMENDATIONS)
+      .mockResolvedValueOnce(MOCK_SIMILAR_TRACKS_RAW);
+
+    render(<SeedSong />);
+    await selectTrack();
+
+    expect(screen.getByTestId("why-chip-energy")).toBeInTheDocument();
+    expect(screen.getByTestId("why-chip-valence")).toBeInTheDocument();
+    expect(screen.getByTestId("why-chip-danceability")).toBeInTheDocument();
+  });
+
+  it("shows empty state when fetch_similar_tracks throws", async () => {
+    mockInvoke
+      .mockResolvedValueOnce(MOCK_SEARCH_RESULTS)
+      .mockResolvedValueOnce(MOCK_RECOMMENDATIONS)
+      .mockRejectedValueOnce(new Error("DB sparse"));
+
+    render(<SeedSong />);
+    await selectTrack();
+
+    expect(
+      screen.getByText(/no similar tracks found/i)
+    ).toBeInTheDocument();
   });
 });

@@ -315,6 +315,24 @@ pub async fn export_playlist(mut payload: Value) -> Result<Value, String> {
     check_response(resp).await
 }
 
+/// Fetch tracks similar to a seed track using the local cosine-similarity engine.
+///
+/// Proxies to `GET /search/recommendations/similar` on the Python sidecar.
+/// Falls back to artist-search when the local audio_features cache is sparse.
+#[tauri::command]
+pub async fn fetch_similar_tracks(track_id: String, limit: Option<u32>) -> Result<Value, String> {
+    let base = sidecar_base();
+    let limit = limit.unwrap_or(20);
+    let url = format!("{base}/search/recommendations/similar?track_id={track_id}&limit={limit}&access_token=placeholder");
+    let client = Client::new();
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach sidecar: {e}"))?;
+    check_response(resp).await
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------

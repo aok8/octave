@@ -250,6 +250,7 @@ pub fn run() {
             commands::api::export_db,
             commands::api::import_db,
             commands::api::get_recently_used,
+            commands::api::fetch_similar_tracks,
             // defined in commands/discovery.rs
             commands::discovery::start_discovery_session,
             commands::discovery::send_discovery_feedback,

@@ -139,13 +139,18 @@ def _mock_audio_features(mocker, stub=None):
 
 
 def _mock_search_discovery(mocker, seed_stub=None, search_stub=None):
-    """Patch sp.track() and sp.search() for the artist-search discovery flow."""
+    """Patch sp.track(), sp.search(), and find_similar_tracks for discovery flow.
+
+    Patches ``discovery.find_similar_tracks`` to return [] so the artist-search
+    fallback path is always exercised in these integration tests.
+    """
     if seed_stub is None:
         seed_stub = SEED_TRACK_STUB
     if search_stub is None:
         search_stub = SEARCH_RESULTS_STUB
     mocker.patch.object(spotipy.Spotify, "track", return_value=seed_stub)
     mocker.patch.object(spotipy.Spotify, "search", return_value=search_stub)
+    mocker.patch("similarity.find_similar_tracks", return_value=[])
 
 
 # ---------------------------------------------------------------------------

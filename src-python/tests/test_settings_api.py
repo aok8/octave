@@ -87,7 +87,7 @@ def test_rapidapi_key_save_validates_whitespace_only(client: TestClient, tmp_db:
 
 
 def test_rapidapi_test_endpoint_success(client: TestClient, tmp_db: str, mocker):
-    """POST /settings/test-rapidapi with mocked httpx → ok=true."""
+    """POST /settings/test-rapidapi with mocked requests → ok=true."""
     fake_response = mocker.MagicMock()
     fake_response.status_code = 200
     fake_response.json.return_value = {
@@ -102,7 +102,7 @@ def test_rapidapi_test_endpoint_success(client: TestClient, tmp_db: str, mocker)
         "key": "E minor",
         "time_signature": 4,
     }
-    mocker.patch("rapidapi_client.httpx.get", return_value=fake_response)
+    mocker.patch("rapidapi_client.requests.get", return_value=fake_response)
 
     response = client.post(
         "/settings/test-rapidapi",
@@ -115,12 +115,12 @@ def test_rapidapi_test_endpoint_success(client: TestClient, tmp_db: str, mocker)
 
 
 def test_rapidapi_test_endpoint_failure(client: TestClient, tmp_db: str, mocker):
-    """POST /settings/test-rapidapi when httpx raises → ok=false, error non-null."""
-    import httpx as httpx_lib
+    """POST /settings/test-rapidapi when requests raises → ok=false, error non-null."""
+    import requests.exceptions
 
     mocker.patch(
-        "rapidapi_client.httpx.get",
-        side_effect=httpx_lib.ConnectError("Connection refused"),
+        "rapidapi_client.requests.get",
+        side_effect=requests.exceptions.ConnectionError("Connection refused"),
     )
 
     response = client.post(
@@ -139,7 +139,7 @@ def test_rapidapi_test_endpoint_404(client: TestClient, tmp_db: str, mocker):
     fake_response = mocker.MagicMock()
     fake_response.status_code = 404
 
-    mocker.patch("rapidapi_client.httpx.get", return_value=fake_response)
+    mocker.patch("rapidapi_client.requests.get", return_value=fake_response)
 
     response = client.post(
         "/settings/test-rapidapi",

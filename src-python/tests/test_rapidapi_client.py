@@ -5,7 +5,7 @@ Unit tests only — no HTTP calls, no DB, no TestClient needed.
 """
 
 import pytest
-import httpx
+import requests.exceptions
 
 import rapidapi_client
 from rapidapi_client import (
@@ -120,7 +120,7 @@ def test_normalize_response_missing_fields():
 
 
 def test_get_features_batch_success(mocker):
-    """Mock httpx.get returning 200 with valid data; assert normalized result returned."""
+    """Mock requests.get returning 200 with valid data; assert normalized result returned."""
     fake_response = mocker.MagicMock()
     fake_response.status_code = 200
     fake_response.json.return_value = {
@@ -135,7 +135,7 @@ def test_get_features_batch_success(mocker):
         "key": "G major",
         "time_signature": 4,
     }
-    mocker.patch("rapidapi_client.httpx.get", return_value=fake_response)
+    mocker.patch("rapidapi_client.requests.get", return_value=fake_response)
 
     results = get_features_batch(["track_abc"], "fake_api_key")
 
@@ -148,21 +148,21 @@ def test_get_features_batch_success(mocker):
 
 
 def test_get_features_batch_404(mocker):
-    """Mock httpx.get returning 404; assert empty list (best-effort, no crash)."""
+    """Mock requests.get returning 404; assert empty list (best-effort, no crash)."""
     fake_response = mocker.MagicMock()
     fake_response.status_code = 404
 
-    mocker.patch("rapidapi_client.httpx.get", return_value=fake_response)
+    mocker.patch("rapidapi_client.requests.get", return_value=fake_response)
 
     results = get_features_batch(["missing_track"], "fake_api_key")
     assert results == []
 
 
 def test_get_features_batch_error(mocker):
-    """Mock httpx.get raising an exception; assert empty list (best-effort, no crash)."""
+    """Mock requests.get raising a connection error; assert empty list (best-effort, no crash)."""
     mocker.patch(
-        "rapidapi_client.httpx.get",
-        side_effect=httpx.ConnectError("Connection refused"),
+        "rapidapi_client.requests.get",
+        side_effect=requests.exceptions.ConnectionError("Connection refused"),
     )
 
     results = get_features_batch(["error_track"], "fake_api_key")
@@ -175,7 +175,7 @@ def test_get_features_batch_multiple_tracks(mocker):
 
     def fake_get(url, **kwargs):
         nonlocal call_count
-        # Track ID is now the last path segment: /pktx/spotify/{track_id}
+        # Track ID is the last path segment: /pktx/spotify/{track_id}
         track_id = url.rstrip("/").split("/")[-1]
         resp = mocker.MagicMock()
         if track_id == "good_track":
@@ -196,7 +196,7 @@ def test_get_features_batch_multiple_tracks(mocker):
         call_count += 1
         return resp
 
-    mocker.patch("rapidapi_client.httpx.get", side_effect=fake_get)
+    mocker.patch("rapidapi_client.requests.get", side_effect=fake_get)
 
     results = get_features_batch(["good_track", "bad_track"], "fake_api_key")
     assert len(results) == 1
@@ -206,7 +206,7 @@ def test_get_features_batch_multiple_tracks(mocker):
 
 def test_get_features_batch_empty_ids(mocker):
     """Empty track_ids list returns empty list without making any HTTP calls."""
-    mock_get = mocker.patch("rapidapi_client.httpx.get")
+    mock_get = mocker.patch("rapidapi_client.requests.get")
 
     results = get_features_batch([], "fake_api_key")
     assert results == []

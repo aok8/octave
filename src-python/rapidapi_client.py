@@ -13,7 +13,8 @@ Normalization:
 import time
 from typing import Optional
 
-import httpx
+import requests
+import requests.exceptions
 
 RAPIDAPI_HOST = "track-analysis.p.rapidapi.com"
 
@@ -120,14 +121,14 @@ def probe_endpoint(api_key: str, track_id: str) -> dict:
         }
     """
     headers = {
-        "X-RapidAPI-Key": api_key,
-        "X-RapidAPI-Host": RAPIDAPI_HOST,
+        "x-rapidapi-key": api_key,
+        "x-rapidapi-host": RAPIDAPI_HOST,
     }
     try:
-        response = httpx.get(
+        response = requests.get(
             f"https://{RAPIDAPI_HOST}/pktx/spotify/{track_id}",
             headers=headers,
-            timeout=10.0,
+            timeout=15,
         )
         try:
             body = response.json()
@@ -149,8 +150,8 @@ def probe_endpoint(api_key: str, track_id: str) -> dict:
                 f"Response: {str(body)[:200]}"
             ),
         }
-    except httpx.TimeoutException:
-        return {"ok": False, "status": None, "body": None, "error": "Request timed out (10s)"}
+    except requests.exceptions.Timeout:
+        return {"ok": False, "status": None, "body": None, "error": "Request timed out (15s)"}
     except Exception as exc:
         return {"ok": False, "status": None, "body": None, "error": str(exc)}
 
@@ -170,17 +171,17 @@ def get_features_batch(track_ids: list, api_key: str) -> list:
         List of normalized feature dicts (one per successfully fetched track).
     """
     headers = {
-        "X-RapidAPI-Key": api_key,
-        "X-RapidAPI-Host": RAPIDAPI_HOST,
+        "x-rapidapi-key": api_key,
+        "x-rapidapi-host": RAPIDAPI_HOST,
     }
 
     results = []
     for track_id in track_ids:
         try:
-            response = httpx.get(
+            response = requests.get(
                 f"https://{RAPIDAPI_HOST}/pktx/spotify/{track_id}",
                 headers=headers,
-                timeout=8.0,
+                timeout=10,
             )
             if response.status_code != 200:
                 continue

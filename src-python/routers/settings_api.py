@@ -106,15 +106,12 @@ def delete_rapidapi_key():
 def test_rapidapi_key(body: TestRapidApiRequest):
     """Test a RapidAPI key by making a live call to the SoundNet endpoint.
 
-    Uses a known Spotify track ID as the test payload.
+    Uses a known Spotify track ID as the test payload. Surfaces the real HTTP
+    status and response body so the UI can show useful diagnostics when the
+    endpoint URL or key is wrong.
 
     Returns:
         {"ok": bool, "error": str|null}
     """
-    try:
-        results = rapidapi_client.get_features_batch([_TEST_TRACK_ID], body.key)
-        if results and ("energy" in results[0] or "tempo" in results[0]):
-            return {"ok": True, "error": None}
-        return {"ok": False, "error": "No valid response data returned from API"}
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)}
+    result = rapidapi_client.probe_endpoint(body.key, _TEST_TRACK_ID)
+    return {"ok": result["ok"], "error": result["error"]}

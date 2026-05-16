@@ -104,6 +104,58 @@ def _normalize_response(track_id: str, raw: dict) -> dict:
     }
 
 
+def probe_endpoint(api_key: str, track_id: str) -> dict:
+    """Make a single diagnostic call to the RapidAPI endpoint and return raw results.
+
+    Unlike get_features_batch, this function does NOT swallow errors — it surfaces
+    the HTTP status code and raw response body so callers can show meaningful
+    diagnostics to the user.
+
+    Returns:
+        {
+            "ok": bool,
+            "status": int | None,
+            "body": dict | None,
+            "error": str | None,
+        }
+    """
+    headers = {
+        "X-RapidAPI-Key": api_key,
+        "X-RapidAPI-Host": RAPIDAPI_HOST,
+    }
+    try:
+        response = httpx.get(
+            f"https://{RAPIDAPI_HOST}/track",
+            params={"spotify_id": track_id},
+            headers=headers,
+            timeout=10.0,
+        )
+        try:
+            body = response.json()
+        except Exception:
+            body = {"raw": response.text[:500]}
+
+        if response.status_code == 200 and (
+            body.get("energy") is not None or body.get("tempo") is not None
+        ):
+            return {"ok": True, "status": 200, "body": body, "error": None}
+
+        # Return diagnostic info so the caller can show a useful error
+        return {
+            "ok": False,
+            "status": response.status_code,
+            "body": body,
+            "error": (
+                f"API returned HTTP {response.status_code}. "
+                f"Response: {str(body)[:200]}"
+            ),
+        }
+    except httpx.TimeoutException:
+        return {"ok": False, "status": None, "body": None, "error": "Request timed out (10s)"}
+    except Exception as exc:
+        return {"ok": False, "status": None, "body": None, "error": str(exc)}
+
+
 def get_features_batch(track_ids: list, api_key: str) -> list:
     """Fetch audio features for a list of Spotify track IDs via SoundNet RapidAPI.
 
@@ -126,7 +178,6 @@ def get_features_batch(track_ids: list, api_key: str) -> list:
     results = []
     for track_id in track_ids:
         try:
-            # TODO: verify endpoint URL — the exact path may differ from /track
             response = httpx.get(
                 f"https://{RAPIDAPI_HOST}/track",
                 params={"spotify_id": track_id},
@@ -134,13 +185,11 @@ def get_features_batch(track_ids: list, api_key: str) -> list:
                 timeout=8.0,
             )
             if response.status_code != 200:
-                # Best-effort: skip tracks that return non-200
                 continue
             raw = response.json()
             normalized = _normalize_response(track_id, raw)
             results.append(normalized)
         except Exception:
-            # Best-effort: swallow all per-track errors silently
             continue
 
     return results

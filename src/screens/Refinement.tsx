@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useReducer, useRef, useCallback, useMemo } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../utils/invoke";
 import { AnimatePresence, motion } from "framer-motion";
 import { AudioFeatureSlider } from "../components/AudioFeatureSlider";
 import { TrackCard } from "../components/TrackCard";

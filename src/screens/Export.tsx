@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../utils/invoke";
 import { ErrorState } from "../components/ErrorState";
 import type { Playlist } from "../types";
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../utils/invoke";
 import { AnimatePresence, motion } from "framer-motion";
 import { PlaylistCard } from "../components/PlaylistCard";
 import { LoadingState } from "../components/LoadingState";

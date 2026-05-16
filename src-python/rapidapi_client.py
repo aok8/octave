@@ -125,8 +125,7 @@ def probe_endpoint(api_key: str, track_id: str) -> dict:
     }
     try:
         response = httpx.get(
-            f"https://{RAPIDAPI_HOST}/track",
-            params={"spotify_id": track_id},
+            f"https://{RAPIDAPI_HOST}/pktx/spotify/{track_id}",
             headers=headers,
             timeout=10.0,
         )
@@ -179,8 +178,7 @@ def get_features_batch(track_ids: list, api_key: str) -> list:
     for track_id in track_ids:
         try:
             response = httpx.get(
-                f"https://{RAPIDAPI_HOST}/track",
-                params={"spotify_id": track_id},
+                f"https://{RAPIDAPI_HOST}/pktx/spotify/{track_id}",
                 headers=headers,
                 timeout=8.0,
             )

@@ -175,7 +175,8 @@ def test_get_features_batch_multiple_tracks(mocker):
 
     def fake_get(url, **kwargs):
         nonlocal call_count
-        track_id = kwargs.get("params", {}).get("spotify_id", "")
+        # Track ID is now the last path segment: /pktx/spotify/{track_id}
+        track_id = url.rstrip("/").split("/")[-1]
         resp = mocker.MagicMock()
         if track_id == "good_track":
             resp.status_code = 200

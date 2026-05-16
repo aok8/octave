@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../utils/invoke";
 
 export interface AuthState {
   is_authenticated: boolean;

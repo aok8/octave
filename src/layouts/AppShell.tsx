@@ -265,6 +265,7 @@ flexShrink: 0,
         <main
           style={{
             flex: 1,
+            height: "100%",
             overflowY: "auto",
             position: "relative",
           }}

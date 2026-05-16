@@ -25,6 +25,8 @@ pub(super) async fn check_response(resp: reqwest::Response) -> Result<Value, Str
         resp.json::<Value>()
             .await
             .map_err(|e| format!("Failed to parse sidecar response: {e}"))
+    } else if status == reqwest::StatusCode::UNAUTHORIZED {
+        Err("AUTH_EXPIRED: Spotify token expired or revoked. Please log in again.".to_string())
     } else {
         let body = resp.text().await.unwrap_or_default();
         Err(format!("Sidecar returned HTTP {status}: {body}"))

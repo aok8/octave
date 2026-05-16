@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "./utils/invoke";
 import { AppShell } from "./layouts/AppShell";
 import { Login } from "./screens/Login";
 import Home from "./screens/Home";
@@ -78,6 +78,13 @@ function LoadingSplash() {
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>({ id: "loading" });
+
+  // Redirect to login on Spotify token expiry (fired by utils/invoke.ts)
+  useEffect(() => {
+    const handler = () => setScreen({ id: "login" });
+    window.addEventListener("octave-auth-expired", handler);
+    return () => window.removeEventListener("octave-auth-expired", handler);
+  }, []);
 
   // Check auth state on mount
   useEffect(() => {

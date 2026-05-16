@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { invoke } from "../utils/invoke";
 import { PlaylistCard } from "../components/PlaylistCard";
 import { TrackCard } from "../components/TrackCard";
 import { LoadingState } from "../components/LoadingState";

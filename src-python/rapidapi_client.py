@@ -11,6 +11,7 @@ Normalization:
 """
 
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 
 import requests
@@ -156,10 +157,27 @@ def probe_endpoint(api_key: str, track_id: str) -> dict:
         return {"ok": False, "status": None, "body": None, "error": str(exc)}
 
 
+def _fetch_single(track_id: str, headers: dict) -> Optional[dict]:
+    """Fetch audio features for one track. Returns None on any error or non-200."""
+    try:
+        response = requests.get(
+            f"https://{RAPIDAPI_HOST}/pktx/spotify/{track_id}",
+            headers=headers,
+            timeout=10,
+        )
+        if response.status_code != 200:
+            return None
+        raw = response.json()
+        return _normalize_response(track_id, raw)
+    except Exception:
+        return None
+
+
 def get_features_batch(track_ids: list, api_key: str) -> list:
     """Fetch audio features for a list of Spotify track IDs via SoundNet RapidAPI.
 
-    SoundNet API is per-track; this function calls the endpoint once per track.
+    SoundNet API is per-track; requests are made in parallel (up to 10
+    concurrent workers) to avoid the latency of sequential calls.
     Per-track errors are swallowed silently (best-effort). Tracks that fail
     are simply omitted from the returned list.
 
@@ -170,25 +188,24 @@ def get_features_batch(track_ids: list, api_key: str) -> list:
     Returns:
         List of normalized feature dicts (one per successfully fetched track).
     """
+    if not track_ids:
+        return []
+
     headers = {
         "x-rapidapi-key": api_key,
         "x-rapidapi-host": RAPIDAPI_HOST,
     }
 
-    results = []
-    for track_id in track_ids:
-        try:
-            response = requests.get(
-                f"https://{RAPIDAPI_HOST}/pktx/spotify/{track_id}",
-                headers=headers,
-                timeout=10,
-            )
-            if response.status_code != 200:
-                continue
-            raw = response.json()
-            normalized = _normalize_response(track_id, raw)
-            results.append(normalized)
-        except Exception:
-            continue
+    results: list = []
+    max_workers = min(len(track_ids), 10)
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {
+            executor.submit(_fetch_single, tid, headers): tid
+            for tid in track_ids
+        }
+        for future in as_completed(futures):
+            result = future.result()
+            if result is not None:
+                results.append(result)
 
     return results

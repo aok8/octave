@@ -122,61 +122,62 @@ def get_audio_features(
         uncached_ids = [tid for tid in ids if tid not in cached_map]
 
         if uncached_ids:
-            try:
-                sp = get_client(access_token)
-            except Exception as exc:
-                raise HTTPException(
-                    status_code=500, detail=f"Spotify client error: {exc}"
-                )
-
-            # Batch into groups of 100
-            fresh_features = []
-            for i in range(0, len(uncached_ids), _BATCH_SIZE):
-                batch = uncached_ids[i : i + _BATCH_SIZE]
-                results = None
-                try:
-                    results = sp.audio_features(batch)
-                except spotipy.SpotifyException as exc:
-                    status = exc.http_status if hasattr(exc, "http_status") else 500
-                    if status == 401:
-                        raise HTTPException(
-                            status_code=401,
-                            detail="Invalid or expired Spotify token",
-                        )
-                    if status in (400, 403):
-                        # Spotify removed this endpoint for most apps.
-                        # Try RapidAPI (SoundNet) first; fall back to synthetic values.
-                        if rapidapi_key:
-                            rapid_results = rapidapi_client.get_features_batch(batch, rapidapi_key)
-                            fetched_ids = set()
-                            for row in rapid_results:
-                                row.setdefault("source", "rapidapi")
-                                upsert_audio_features(conn, row)
-                                cached_map[row["track_id"]] = row
-                                fetched_ids.add(row["track_id"])
-                            # For any track still missing, use synthetic values
-                            results = [
-                                _synthetic_features(tid)
-                                for tid in batch
-                                if tid not in fetched_ids
-                            ]
-                        else:
-                            results = [_synthetic_features(tid) for tid in batch]
-                    else:
-                        raise HTTPException(status_code=status, detail=str(exc))
-                except Exception as exc:
-                    raise HTTPException(
-                        status_code=500,
-                        detail=f"Failed to fetch audio features: {exc}",
-                    )
-
-                for raw in results or []:
-                    if raw is None:
-                        continue
-                    row = _spotify_features_to_dict(raw)
+            if rapidapi_key:
+                # RapidAPI key is configured → skip Spotify entirely and use
+                # RapidAPI (SoundNet) as the primary source.  Spotify's
+                # /audio-features endpoint is deprecated for most apps (403),
+                # so attempting it first only wastes time.
+                rapid_results = rapidapi_client.get_features_batch(uncached_ids, rapidapi_key)
+                fetched_ids: set = set()
+                for row in rapid_results:
+                    row.setdefault("source", "rapidapi")
                     upsert_audio_features(conn, row)
                     cached_map[row["track_id"]] = row
-                    fresh_features.append(row)
+                    fetched_ids.add(row["track_id"])
+                # Synthetic fallback for any tracks RapidAPI couldn't return
+                for tid in uncached_ids:
+                    if tid not in fetched_ids:
+                        synth = _synthetic_features(tid)
+                        row = _spotify_features_to_dict(synth)
+                        upsert_audio_features(conn, row)
+                        cached_map[tid] = row
+            else:
+                # No RapidAPI key: try Spotify, synthetic fallback on 403/400
+                try:
+                    sp = get_client(access_token)
+                except Exception as exc:
+                    raise HTTPException(
+                        status_code=500, detail=f"Spotify client error: {exc}"
+                    )
+
+                for i in range(0, len(uncached_ids), _BATCH_SIZE):
+                    batch = uncached_ids[i : i + _BATCH_SIZE]
+                    results = None
+                    try:
+                        results = sp.audio_features(batch)
+                    except spotipy.SpotifyException as exc:
+                        status = exc.http_status if hasattr(exc, "http_status") else 500
+                        if status == 401:
+                            raise HTTPException(
+                                status_code=401,
+                                detail="Invalid or expired Spotify token",
+                            )
+                        if status in (400, 403):
+                            results = [_synthetic_features(tid) for tid in batch]
+                        else:
+                            raise HTTPException(status_code=status, detail=str(exc))
+                    except Exception as exc:
+                        raise HTTPException(
+                            status_code=500,
+                            detail=f"Failed to fetch audio features: {exc}",
+                        )
+
+                    for raw in results or []:
+                        if raw is None:
+                            continue
+                        row = _spotify_features_to_dict(raw)
+                        upsert_audio_features(conn, row)
+                        cached_map[row["track_id"]] = row
 
         # Return results in the original request order, omitting missing IDs
         return [

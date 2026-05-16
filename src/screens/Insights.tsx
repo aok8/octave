@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { invoke } from "../utils/invoke";
 import { TrackCard } from "../components/TrackCard";
 import { LoadingState } from "../components/LoadingState";
@@ -85,12 +85,19 @@ export function Insights({ playlistId, onBack, onRefine }: InsightsProps) {
   const [fetchedCount, setFetchedCount] = useState(0);
   const [totalToFetch, setTotalToFetch] = useState(0);
 
+  // Guard against React Strict Mode's double-invocation of useEffect in
+  // development.  Without this, two identical chunk loops fire simultaneously,
+  // doubling the RapidAPI request rate and triggering 429s on every chunk.
+  const fetchingRef = useRef(false);
+
   useEffect(() => {
     if (playlistId) loadInsights();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [playlistId]);
 
   async function loadInsights() {
+    if (fetchingRef.current) return; // already in progress — skip duplicate
+    fetchingRef.current = true;
     setLoading(true);
     setError(null);
     setFetchedCount(0);
@@ -144,6 +151,8 @@ export function Insights({ playlistId, onBack, onRefine }: InsightsProps) {
     } catch (err) {
       setError("Could not load insights. Check your connection and try again.");
       setLoading(false);
+    } finally {
+      fetchingRef.current = false;
     }
   }
 

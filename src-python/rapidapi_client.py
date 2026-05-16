@@ -161,34 +161,57 @@ def probe_endpoint(api_key: str, track_id: str) -> dict:
 
 
 def _fetch_single(track_id: str, headers: dict) -> Optional[dict]:
-    """Fetch audio features for one track. Returns None on any error or non-200."""
-    try:
-        response = requests.get(
-            f"https://{RAPIDAPI_HOST}/pktx/spotify/{track_id}",
-            headers=headers,
-            timeout=10,
-        )
-        if response.status_code != 200:
-            logger.warning(
-                "RapidAPI %s for track %s — will use synthetic fallback",
-                response.status_code,
-                track_id,
+    """Fetch audio features for one track.
+
+    Retries once on HTTP 429 after honouring the Retry-After header
+    (defaults to 2 s if the header is absent).  All other errors return None.
+    """
+    for attempt in range(2):
+        try:
+            response = requests.get(
+                f"https://{RAPIDAPI_HOST}/pktx/spotify/{track_id}",
+                headers=headers,
+                timeout=10,
             )
+            if response.status_code == 429:
+                if attempt == 0:
+                    retry_after = int(response.headers.get("Retry-After", "2"))
+                    logger.warning(
+                        "RapidAPI 429 for track %s — backing off %ds then retrying",
+                        track_id, retry_after,
+                    )
+                    time.sleep(retry_after)
+                    continue  # retry
+                else:
+                    logger.warning(
+                        "RapidAPI 429 for track %s (retry also 429) — synthetic fallback",
+                        track_id,
+                    )
+                    return None
+
+            if response.status_code != 200:
+                logger.warning(
+                    "RapidAPI %s for track %s — will use synthetic fallback",
+                    response.status_code,
+                    track_id,
+                )
+                return None
+
+            raw = response.json()
+            result = _normalize_response(track_id, raw)
+            logger.debug(
+                "RapidAPI OK  track=%-24s  energy=%.2f  valence=%.2f  dance=%.2f  tempo=%.0f",
+                track_id,
+                result.get("energy") or 0,
+                result.get("valence") or 0,
+                result.get("danceability") or 0,
+                result.get("tempo") or 0,
+            )
+            return result
+        except Exception as exc:
+            logger.warning("RapidAPI exception for track %s: %s", track_id, exc)
             return None
-        raw = response.json()
-        result = _normalize_response(track_id, raw)
-        logger.debug(
-            "RapidAPI OK  track=%-24s  energy=%.2f  valence=%.2f  dance=%.2f  tempo=%.0f",
-            track_id,
-            result.get("energy") or 0,
-            result.get("valence") or 0,
-            result.get("danceability") or 0,
-            result.get("tempo") or 0,
-        )
-        return result
-    except Exception as exc:
-        logger.warning("RapidAPI exception for track %s: %s", track_id, exc)
-        return None
+    return None
 
 
 def get_features_batch(track_ids: list, api_key: str) -> list:

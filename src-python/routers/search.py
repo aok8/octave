@@ -16,6 +16,7 @@ import spotipy
 from fastapi import APIRouter, HTTPException, Query
 
 from db import get_db, upsert_track
+from similarity import find_similar_tracks
 from spotify_client import get_client
 
 router = APIRouter()
@@ -153,3 +154,72 @@ def get_recommendations(
         conn.close()
 
     return [_spotify_track_to_response(t) for t in tracks]
+
+
+# ---------------------------------------------------------------------------
+# Similarity-based recommendations route
+# ---------------------------------------------------------------------------
+
+
+@router.get("/recommendations/similar")
+def get_similar_recommendations(
+    track_id: str = Query(..., description="Seed Spotify track ID"),
+    limit: int = Query(20, ge=1, le=100, description="Max results to return"),
+    access_token: str = Query(..., description="Spotify access token (required for API contract consistency)"),
+):
+    """Return tracks similar to the seed track using cosine similarity over cached audio features.
+
+    Falls back to the artist-search path (``GET /recommendations``) when the
+    local audio_features cache contains fewer than 3 candidate tracks.
+    """
+    if not track_id.strip():
+        raise HTTPException(status_code=400, detail="track_id must not be empty")
+
+    conn = get_db()
+    try:
+        results = find_similar_tracks(track_id, conn, limit=limit)
+    finally:
+        conn.close()
+
+    # Sparse-cache fallback: if fewer than 3 results, use artist-search
+    if len(results) < 3:
+        try:
+            sp = get_client(access_token)
+            seed = sp.track(track_id)
+        except spotipy.SpotifyException as exc:
+            status = exc.http_status if hasattr(exc, "http_status") else 500
+            if status == 401:
+                raise HTTPException(status_code=401, detail="Invalid or expired Spotify token")
+            raise HTTPException(status_code=status, detail=str(exc))
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Failed to fetch seed track: {exc}")
+
+        artists = seed.get("artists") or []
+        if not artists:
+            return []
+        artist_name = artists[0].get("name", "")
+        if not artist_name:
+            return []
+
+        try:
+            search_result = sp.search(q=f'artist:"{artist_name}"', type="track", limit=min(limit, 50))
+        except spotipy.SpotifyException as exc:
+            status = exc.http_status if hasattr(exc, "http_status") else 500
+            if status == 401:
+                raise HTTPException(status_code=401, detail="Invalid or expired Spotify token")
+            raise HTTPException(status_code=status, detail=str(exc))
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"Similar recommendations fallback failed: {exc}")
+
+        raw_tracks = (search_result.get("tracks") or {}).get("items") or []
+        fallback_tracks = [t for t in raw_tracks if t and t.get("id") and t["id"] != track_id][:limit]
+        return [
+            {
+                "track_id": t["id"],
+                "score": 0.0,
+                "matching_features": [],
+            }
+            for t in fallback_tracks
+        ]
+
+    return results

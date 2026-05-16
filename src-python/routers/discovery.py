@@ -155,8 +155,12 @@ def start_discovery(body: StartRequest):
     finally:
         conn.close()
 
-    # Pre-fetch a small batch of recommendations
-    tracks = get_discovery_tracks(sp, body.seed_track_id, centroid, limit=5)
+    # Pre-fetch a small batch of recommendations (pass conn for similarity engine)
+    conn = get_db()
+    try:
+        tracks = get_discovery_tracks(sp, body.seed_track_id, centroid, limit=5, conn=conn)
+    finally:
+        conn.close()
     first_track = _format_track(tracks[0]) if tracks else None
 
     return {"session_id": session_id, "track": first_track}
@@ -209,8 +213,12 @@ def discovery_feedback(body: FeedbackRequest):
     finally:
         conn.close()
 
-    # Fetch next batch of tracks
-    tracks = get_discovery_tracks(sp, seed_track_id, centroid, limit=3)
+    # Fetch next batch of tracks (pass conn for similarity engine)
+    conn = get_db()
+    try:
+        tracks = get_discovery_tracks(sp, seed_track_id, centroid, limit=3, conn=conn)
+    finally:
+        conn.close()
     next_track = _format_track(tracks[0]) if tracks else None
 
     return {"track": next_track, "session_id": body.session_id}

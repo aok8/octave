@@ -226,4 +226,16 @@ describe("DiscoveryMode screen", () => {
       action: "skip",
     });
   });
+
+  it("11. shows audio similarity hint during active session", async () => {
+    mockInvoke.mockResolvedValueOnce(MOCK_SESSION);
+
+    render(<DiscoveryMode seedTrackId="track-seed-1" />);
+    await act(async () => {});
+
+    expect(screen.getByTestId("discovery-feature-hint")).toBeInTheDocument();
+    expect(screen.getByTestId("discovery-feature-hint")).toHaveTextContent(
+      "Matched by audio similarity"
+    );
+  });
 });

@@ -1,10 +1,13 @@
 """
-discovery.py — AI-free track discovery using Spotify recommendations + adaptive centroid.
+discovery.py — AI-free track discovery using cosine similarity + adaptive centroid.
 
 The centroid tracks the mean audio feature vector of all liked tracks in a session.
 On each feedback step, the centroid is updated with an exponential moving average (alpha=0.3).
-New recommendations are requested from Spotify using the centroid as audio feature targets.
+New recommendations first try the local cosine-similarity engine over cached audio features.
+When the cache is too sparse (< 3 results), it falls back to Spotify artist-search.
 """
+
+import random
 
 DEFAULT_CENTROID = {
     "energy": 0.5,
@@ -50,16 +53,41 @@ def centroid_from_features(audio_features: dict) -> dict:
     return result
 
 
-def get_discovery_tracks(sp, seed_track_id: str, centroid: dict, limit: int = 5) -> list:
-    """Fetch tracks by the seed track's primary artist for discovery.
+def get_discovery_tracks(sp, seed_track_id: str, centroid: dict, limit: int = 5, conn=None) -> list:
+    """Fetch tracks similar to the seed track for discovery.
 
-    Replaces the deprecated sp.recommendations() with a search-based approach:
-    looks up the seed track's artist, then searches for other tracks by that
-    artist. centroid is accepted for API compatibility but not used in the query.
+    Strategy (in order of preference):
+    1. Cosine similarity over cached audio features (``conn`` must be provided).
+       If ``conn`` is None or fewer than 3 similar tracks are found, falls through.
+    2. Artist-search fallback: looks up the seed track's artist and returns
+       other tracks by that artist via Spotify catalog search.
 
-    Returns a list of track dicts with keys: id, name, artists, album, duration_ms.
-    Returns an empty list on any error — never blocks the discovery session.
+    ``centroid`` is accepted for API compatibility but is not used directly in
+    the similarity query (the engine uses stored per-track feature vectors).
+
+    Returns a list of track dicts with keys: id, name, artists, album,
+    album_art_url, duration_ms.  Always returns an empty list on error —
+    never blocks the discovery session.
     """
+    # ------------------------------------------------------------------
+    # 1. Try cosine-similarity over cached audio features
+    # ------------------------------------------------------------------
+    if conn is not None:
+        try:
+            from similarity import find_similar_tracks
+
+            similar = find_similar_tracks(seed_track_id, conn, limit=limit + 5)
+            if len(similar) >= 3:
+                ids = [r["track_id"] for r in similar]
+                sampled = random.sample(ids, min(limit, len(ids)))
+                # Return minimal dicts — caller (_format_track) only needs `id`
+                return [{"id": tid, "name": "", "artists": [], "album": None, "album_art_url": None, "duration_ms": None} for tid in sampled]
+        except Exception:
+            pass  # Fall through to artist-search
+
+    # ------------------------------------------------------------------
+    # 2. Artist-search fallback
+    # ------------------------------------------------------------------
     try:
         seed = sp.track(seed_track_id)
         artists = seed.get("artists") or []

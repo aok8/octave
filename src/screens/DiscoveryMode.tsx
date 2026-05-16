@@ -410,6 +410,19 @@ export function DiscoveryMode({ seedTrackId, onBack }: DiscoveryModeProps) {
                   {currentTrack.album_name}
                 </p>
               </div>
+
+              {/* Audio similarity hint */}
+              <div
+                data-testid="discovery-feature-hint"
+                style={{
+                  fontSize: 11,
+                  color: "rgba(255,255,255,0.35)",
+                  textAlign: "center",
+                  marginTop: 8,
+                }}
+              >
+                Matched by audio similarity
+              </div>
             </motion.div>
           </AnimatePresence>
         )}

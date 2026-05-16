@@ -70,3 +70,9 @@ export interface InteractionEvent {
   eventData?: Record<string, unknown>;
   createdAt: number;
 }
+
+export interface SimilarTrack {
+  trackId: string;
+  score: number;
+  matchingFeatures: string[];
+}

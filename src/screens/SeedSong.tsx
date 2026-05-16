@@ -3,7 +3,22 @@ import { invoke } from "@tauri-apps/api/core";
 import { TrackCard } from "../components/TrackCard";
 import { LoadingState } from "../components/LoadingState";
 import { ErrorState } from "../components/ErrorState";
-import type { Track } from "../types";
+import type { Track, SimilarTrack } from "../types";
+
+// Raw snake_case shape returned by the IPC command
+interface SimilarTrackRaw {
+  track_id: string;
+  score: number;
+  matching_features: string[];
+}
+
+function mapSimilarTrack(r: SimilarTrackRaw): SimilarTrack {
+  return {
+    trackId: r.track_id,
+    score: r.score,
+    matchingFeatures: r.matching_features,
+  };
+}
 
 // ── SeedSong screen ───────────────────────────────────────────────────────────
 
@@ -22,6 +37,9 @@ export function SeedSong({ onBack, onDiscover }: SeedSongProps) {
   const [recommendations, setRecommendations] = useState<Track[]>([]);
   const [recsLoading, setRecsLoading] = useState(false);
   const [recsError, setRecsError] = useState<string | null>(null);
+
+  const [similarTracks, setSimilarTracks] = useState<SimilarTrack[]>([]);
+  const [similarLoading, setSimilarLoading] = useState(false);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -58,16 +76,28 @@ export function SeedSong({ onBack, onDiscover }: SeedSongProps) {
     setRecsLoading(true);
     setRecsError(null);
     setRecommendations([]);
-    try {
-      const data = await invoke<Track[]>("fetch_recommendations", {
-        seedTrackId: track.id,
-      });
-      setRecommendations(data);
-    } catch {
+    setSimilarTracks([]);
+    setSimilarLoading(true);
+
+    // Fire both fetches in parallel
+    const [recsResult, similarResult] = await Promise.allSettled([
+      invoke<Track[]>("fetch_recommendations", { seedTrackId: track.id }),
+      invoke<SimilarTrackRaw[]>("fetch_similar_tracks", { trackId: track.id }),
+    ]);
+
+    if (recsResult.status === "fulfilled") {
+      setRecommendations(recsResult.value);
+    } else {
       setRecsError("Could not fetch recommendations. Try again.");
-    } finally {
-      setRecsLoading(false);
     }
+
+    if (similarResult.status === "fulfilled" && Array.isArray(similarResult.value)) {
+      setSimilarTracks(similarResult.value.map(mapSimilarTrack));
+    }
+    // On failure (or non-array response) we silently show empty state — DB may be sparse
+
+    setRecsLoading(false);
+    setSimilarLoading(false);
   }
 
   return (
@@ -225,6 +255,7 @@ export function SeedSong({ onBack, onDiscover }: SeedSongProps) {
               onClick={() => {
                 setSelectedTrack(null);
                 setRecommendations([]);
+                setSimilarTracks([]);
               }}
               style={{
                 background: "transparent",
@@ -258,6 +289,102 @@ export function SeedSong({ onBack, onDiscover }: SeedSongProps) {
               ))}
             </div>
           )}
+
+          {/* ── Similar Tracks section ──────────────────────────────────── */}
+          <div style={{ marginTop: 28 }}>
+            <h2
+              style={{
+                fontSize: 12,
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.40)",
+                textTransform: "uppercase",
+                letterSpacing: "0.08em",
+                margin: "0 0 12px",
+              }}
+            >
+              Similar Tracks
+            </h2>
+
+            {similarLoading ? (
+              <LoadingState type="list" rows={3} />
+            ) : similarTracks.length === 0 ? (
+              <p style={{ fontSize: 14, color: "rgba(255,255,255,0.35)", margin: 0 }}>
+                No similar tracks found — try loading more playlists first.
+              </p>
+            ) : (
+              <div>
+                {similarTracks.map((sim) => (
+                  <div
+                    key={sim.trackId}
+                    data-testid={`similar-track-${sim.trackId}`}
+                    style={{ marginBottom: 4 }}
+                  >
+                    {/* Score label sits above the card */}
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        paddingLeft: 12,
+                        marginBottom: 2,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 11,
+                          color: "rgba(255,255,255,0.30)",
+                          fontVariantNumeric: "tabular-nums",
+                        }}
+                      >
+                        {(sim.score * 100).toFixed(0)}% match
+                      </span>
+                    </div>
+
+                    <TrackCard
+                      track={{
+                        id: sim.trackId,
+                        name: sim.trackId,
+                        artistNames: [],
+                        popularity: 0,
+                      }}
+                    />
+
+                    {/* Feature chips */}
+                    {sim.matchingFeatures.length > 0 && (
+                      <div
+                        style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 4,
+                          paddingLeft: 70,
+                          marginTop: 4,
+                          marginBottom: 6,
+                        }}
+                      >
+                        {sim.matchingFeatures.map((feature) => (
+                          <span
+                            key={feature}
+                            data-testid={`why-chip-${feature}`}
+                            style={{
+                              background: "rgba(29,185,255,0.12)",
+                              border: "1px solid rgba(29,185,255,0.25)",
+                              borderRadius: 4,
+                              padding: "2px 7px",
+                              fontSize: 11,
+                              color: "#1DB9FF",
+                              fontFamily: "inherit",
+                            }}
+                          >
+                            {feature}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* Discover button — shown when track is selected and not loading */}
           {!recsLoading && !recsError && onDiscover && (

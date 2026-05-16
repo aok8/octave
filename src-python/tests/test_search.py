@@ -1,12 +1,14 @@
 """
-Tests for GET /search/tracks and GET /recommendations endpoints.
+Tests for GET /search/tracks, GET /recommendations, and GET /recommendations/similar endpoints.
 
 Acceptance criteria covered:
   AC-S2-06 — Search returns results with correct fields
+  Sprint 3  — Similarity-based recommendations endpoint
 """
 
 import json
 import sqlite3
+import time
 
 import pytest
 import responses as resp_mock
@@ -177,3 +179,100 @@ def test_recommendations_uses_artist_search(client: TestClient, mocker):
         assert "Test Artist" in query, f"Expected artist name in search query, got: {query}"
     else:
         pytest.skip(f"Endpoint not implemented yet (status {response.status_code})")
+
+
+# ---------------------------------------------------------------------------
+# Similarity-based recommendations tests (Sprint 3)
+# ---------------------------------------------------------------------------
+
+
+def _seed_audio_features(db_path: str, track_id: str, **features) -> None:
+    """Insert an audio_features row directly into the temp DB."""
+    conn = sqlite3.connect(db_path)
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO audio_features
+            (track_id, energy, tempo, valence, danceability, acousticness,
+             instrumentalness, speechiness, loudness, cached_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            track_id,
+            features.get("energy", 0.5),
+            features.get("tempo", 120.0),
+            features.get("valence", 0.5),
+            features.get("danceability", 0.5),
+            features.get("acousticness", 0.3),
+            features.get("instrumentalness", 0.0),
+            features.get("speechiness", 0.05),
+            features.get("loudness", -5.0),
+            int(time.time()),
+        ),
+    )
+    conn.commit()
+    conn.close()
+
+
+def test_similar_returns_empty_for_unknown_track(client: TestClient, tmp_db: str, mocker):
+    """Unknown seed with sparse cache must fall back to artist-search or return [].
+
+    When the seed track has no features row and the cache is empty, the endpoint
+    must return a valid JSON response (list) without error.
+    """
+    seed_id = "totally_unknown_track_xyz"
+
+    # Patch Spotify so the fallback artist-search also returns nothing
+    mocker.patch.object(spotipy.Spotify, "track", return_value=_make_seed_track(seed_id, "NoArtist"))
+    mocker.patch.object(
+        spotipy.Spotify,
+        "search",
+        return_value={"tracks": {"items": [], "total": 0, "next": None}},
+    )
+
+    response = client.get(
+        "/search/recommendations/similar",
+        params={"track_id": seed_id, "access_token": FAKE_TOKEN},
+    )
+    assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
+    data = response.json()
+    assert isinstance(data, list), f"Expected a list, got: {type(data)}"
+
+
+def test_similar_returns_sorted_results(client: TestClient, tmp_db: str):
+    """Seed 3 tracks with features in DB; response must be sorted by score descending."""
+    seed_id = "sim_seed_track"
+
+    # Seed: high energy, high valence
+    _seed_audio_features(tmp_db, seed_id, energy=0.9, valence=0.9, danceability=0.8,
+                         tempo=160.0, acousticness=0.1, instrumentalness=0.0)
+    # Close to seed
+    _seed_audio_features(tmp_db, "sim_close", energy=0.85, valence=0.88, danceability=0.78,
+                         tempo=158.0, acousticness=0.12, instrumentalness=0.02)
+    # Moderate distance
+    _seed_audio_features(tmp_db, "sim_mid", energy=0.5, valence=0.5, danceability=0.5,
+                         tempo=100.0, acousticness=0.4, instrumentalness=0.2)
+    # Far from seed
+    _seed_audio_features(tmp_db, "sim_far", energy=0.1, valence=0.1, danceability=0.1,
+                         tempo=40.0, acousticness=0.9, instrumentalness=0.9)
+
+    response = client.get(
+        "/search/recommendations/similar",
+        params={"track_id": seed_id, "access_token": FAKE_TOKEN, "limit": 10},
+    )
+    assert response.status_code == 200, f"Expected 200: {response.text}"
+    results = response.json()
+    assert isinstance(results, list), "Response must be a list"
+    assert len(results) >= 3, f"Expected at least 3 results, got {len(results)}"
+
+    scores = [r["score"] for r in results]
+    assert scores == sorted(scores, reverse=True), f"Results not sorted by score: {scores}"
+
+    # First result should be the close track
+    assert results[0]["track_id"] == "sim_close", (
+        f"Expected sim_close first (closest), got: {results[0]['track_id']}"
+    )
+    # Each result must have required keys
+    for r in results:
+        assert "track_id" in r
+        assert "score" in r
+        assert "matching_features" in r

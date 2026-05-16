@@ -450,7 +450,9 @@ mod tests {
                 .await;
 
             let err = fetch_playlists(None).await.unwrap_err();
-            assert!(err.contains("401"));
+            // check_response turns HTTP 401 into AUTH_EXPIRED (not a raw status string)
+            // so the frontend's invoke wrapper can detect it and redirect to login.
+            assert!(err.starts_with("AUTH_EXPIRED"), "expected AUTH_EXPIRED prefix, got: {err}");
         })
         .await;
     }

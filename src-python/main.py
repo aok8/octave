@@ -1,3 +1,4 @@
+import logging
 import sys
 import os
 
@@ -12,6 +13,20 @@ from routers.discovery import router as discovery_router
 from routers.ai_router import router as ai_router
 from routers.settings_api import router as settings_router
 import uvicorn
+
+# Configure logging so rapidapi_client and router debug output appears
+# in the Tauri console (sidecar stdout/stderr is captured and prefixed
+# with "sidecar:" in the Rust debug logs).
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(levelname)s [%(name)s] %(message)s",
+    stream=sys.stderr,
+)
+# Quiet down overly verbose third-party loggers
+logging.getLogger("uvicorn").setLevel(logging.WARNING)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("urllib3").setLevel(logging.WARNING)
 
 app = FastAPI(title="Octave API", version="2.0.0")
 

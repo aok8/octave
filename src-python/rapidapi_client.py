@@ -10,12 +10,15 @@ Normalization:
   - SoundNet key notation ("F# minor") → pitch class int (0-11) + mode (0=minor, 1=major)
 """
 
+import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Optional
 
 import requests
 import requests.exceptions
+
+logger = logging.getLogger(__name__)
 
 RAPIDAPI_HOST = "track-analysis.p.rapidapi.com"
 
@@ -166,10 +169,25 @@ def _fetch_single(track_id: str, headers: dict) -> Optional[dict]:
             timeout=10,
         )
         if response.status_code != 200:
+            logger.warning(
+                "RapidAPI %s for track %s — will use synthetic fallback",
+                response.status_code,
+                track_id,
+            )
             return None
         raw = response.json()
-        return _normalize_response(track_id, raw)
-    except Exception:
+        result = _normalize_response(track_id, raw)
+        logger.debug(
+            "RapidAPI OK  track=%-24s  energy=%.2f  valence=%.2f  dance=%.2f  tempo=%.0f",
+            track_id,
+            result.get("energy") or 0,
+            result.get("valence") or 0,
+            result.get("danceability") or 0,
+            result.get("tempo") or 0,
+        )
+        return result
+    except Exception as exc:
+        logger.warning("RapidAPI exception for track %s: %s", track_id, exc)
         return None
 
 
@@ -201,6 +219,7 @@ def get_features_batch(track_ids: list, api_key: str) -> list:
     # Firing more simultaneously causes 429 responses that silently fall
     # back to synthetic values.
     max_workers = min(len(track_ids), 5)
+    logger.info("RapidAPI batch: requesting %d tracks (workers=%d)", len(track_ids), max_workers)
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
             executor.submit(_fetch_single, tid, headers): tid
@@ -211,4 +230,11 @@ def get_features_batch(track_ids: list, api_key: str) -> list:
             if result is not None:
                 results.append(result)
 
+    failed = len(track_ids) - len(results)
+    logger.info(
+        "RapidAPI batch done: %d/%d succeeded, %d → synthetic fallback",
+        len(results),
+        len(track_ids),
+        failed,
+    )
     return results

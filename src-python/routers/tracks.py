@@ -8,6 +8,7 @@ GET /tracks/audio-features?track_ids=id1,id2,...&access_token=<token>
     Returns all requested features (cache + fresh).
 """
 
+import logging
 import time
 from typing import List, Optional
 
@@ -18,6 +19,7 @@ import rapidapi_client
 from db import get_ai_config, get_cached_features, get_db, upsert_audio_features
 from spotify_client import get_client
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 _BATCH_SIZE = 100
@@ -123,13 +125,25 @@ def get_audio_features(
         # When a RapidAPI key is configured, treat previously-synthesised
         # entries as cache misses so they get replaced with real data.
         if rapidapi_key:
+            before = len(cached_map)
             cached_map = {
                 tid: row
                 for tid, row in cached_map.items()
                 if row.get("source") not in (None, "synthetic")
             }
+            dropped = before - len(cached_map)
+            if dropped:
+                logger.info(
+                    "Cache: dropped %d synthetic entries (will re-fetch via RapidAPI)", dropped
+                )
 
         uncached_ids = [tid for tid in ids if tid not in cached_map]
+        logger.info(
+            "Audio features request: %d total, %d cached (real), %d to fetch",
+            len(ids),
+            len(cached_map),
+            len(uncached_ids),
+        )
 
         if uncached_ids:
             if rapidapi_key:

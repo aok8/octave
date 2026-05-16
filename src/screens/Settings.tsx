@@ -67,8 +67,19 @@ export function Settings({ onLogout }: SettingsProps) {
   const [user, setUser] = useState<UserProfile | null>(null);
   const [logoutSuccess, setLogoutSuccess] = useState(false);
 
+  // RapidAPI Audio Features state
+  const [rapidApiKey, setRapidApiKey] = useState("");
+  const [rapidApiStatus, setRapidApiStatus] = useState<{ configured: boolean; source: string } | null>(null);
+  const [rapidApiTestResult, setRapidApiTestResult] = useState<{ ok: boolean; error: string | null } | null>(null);
+  const [rapidApiSaving, setRapidApiSaving] = useState(false);
+  const [rapidApiTesting, setRapidApiTesting] = useState(false);
+  const [showKey, setShowKey] = useState(false);
+
   useEffect(() => {
     invoke<UserProfile>("get_user_profile").then(setUser).catch(() => {});
+    invoke<{ configured: boolean; source: string }>("get_rapidapi_status")
+      .then(setRapidApiStatus)
+      .catch(() => {});
   }, []);
   const [exportSuccess, setExportSuccess] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
@@ -108,6 +119,45 @@ export function Settings({ onLogout }: SettingsProps) {
       setImportError(
         err instanceof Error ? err.message : "Import failed. Please try again."
       );
+    }
+  }
+
+  async function handleSaveRapidApiKey() {
+    setRapidApiSaving(true);
+    setRapidApiTestResult(null);
+    try {
+      await invoke("save_rapidapi_key", { key: rapidApiKey });
+      const status = await invoke<{ configured: boolean; source: string }>("get_rapidapi_status");
+      setRapidApiStatus(status);
+    } catch {
+      // swallow — status chip stays unchanged
+    } finally {
+      setRapidApiSaving(false);
+    }
+  }
+
+  async function handleTestRapidApiKey() {
+    setRapidApiTesting(true);
+    setRapidApiTestResult(null);
+    try {
+      const result = await invoke<{ ok: boolean; error: string | null }>("test_rapidapi_key", { key: rapidApiKey });
+      setRapidApiTestResult(result);
+    } catch (err) {
+      setRapidApiTestResult({ ok: false, error: err instanceof Error ? err.message : "Test failed." });
+    } finally {
+      setRapidApiTesting(false);
+    }
+  }
+
+  async function handleDeleteRapidApiKey() {
+    try {
+      await invoke("delete_rapidapi_key");
+      setRapidApiKey("");
+      const status = await invoke<{ configured: boolean; source: string }>("get_rapidapi_status");
+      setRapidApiStatus(status);
+      setRapidApiTestResult(null);
+    } catch {
+      // swallow
     }
   }
 
@@ -305,6 +355,177 @@ export function Settings({ onLogout }: SettingsProps) {
         >
           Configure your API key in the AI Prompt screen.
         </p>
+      </div>
+
+      {/* ── Audio Features section ──────────────────────────────────────────── */}
+      <div
+        data-testid="settings-audio-features-section"
+        role="region"
+        aria-label="Audio Features"
+        style={sectionStyle}
+      >
+        <p style={sectionLabelStyle}>Audio Features</p>
+
+        {/* RapidAPI Key input */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ fontSize: 13, fontWeight: 500, color: "#fff" }}>RapidAPI Key</span>
+            {/* Status chip */}
+            {rapidApiStatus ? (
+              <span
+                data-testid="settings-rapidapi-status-chip"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  padding: "3px 10px",
+                  borderRadius: 20,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  ...(rapidApiStatus.source === "rapidapi"
+                    ? { background: "rgba(40,202,65,0.12)", color: "#28CA41", border: "1px solid rgba(40,202,65,0.30)" }
+                    : rapidApiStatus.source === "synthetic"
+                    ? { background: "rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.45)", border: "1px solid rgba(255,255,255,0.12)" }
+                    : { background: "rgba(255,217,61,0.10)", color: "#FFD93D", border: "1px solid rgba(255,217,61,0.30)" }),
+                }}
+              >
+                {rapidApiStatus.source === "rapidapi"
+                  ? "RapidAPI"
+                  : rapidApiStatus.source === "synthetic"
+                  ? "Synthetic"
+                  : "Not configured"}
+              </span>
+            ) : (
+              <span
+                data-testid="settings-rapidapi-status-chip"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "3px 10px",
+                  borderRadius: 20,
+                  fontSize: 11,
+                  fontWeight: 600,
+                  background: "rgba(255,217,61,0.10)",
+                  color: "#FFD93D",
+                  border: "1px solid rgba(255,217,61,0.30)",
+                }}
+              >
+                Not configured
+              </span>
+            )}
+          </div>
+
+          <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)", lineHeight: 1.4 }}>
+            Powers audio analysis charts (energy, tempo, danceability). Get a key at{" "}
+            <span style={{ color: "rgba(255,255,255,0.65)" }}>
+              rapidapi.com/soundnet-soundnet-default/api/track-analysis
+            </span>
+          </span>
+
+          {/* Key input with show/hide toggle */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <input
+              data-testid="settings-rapidapi-key-input"
+              type={showKey ? "text" : "password"}
+              placeholder="Paste your RapidAPI key…"
+              value={rapidApiKey}
+              onChange={(e) => setRapidApiKey(e.target.value)}
+              style={{
+                flex: 1,
+                padding: "9px 12px",
+                borderRadius: 8,
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "rgba(255,255,255,0.05)",
+                color: "#fff",
+                fontSize: 13,
+                fontFamily: "inherit",
+                outline: "none",
+              }}
+            />
+            <button
+              data-testid="settings-rapidapi-show-key-btn"
+              onClick={() => setShowKey((v) => !v)}
+              title={showKey ? "Hide key" : "Show key"}
+              style={{
+                padding: "9px 12px",
+                borderRadius: 8,
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "rgba(255,255,255,0.05)",
+                color: "rgba(255,255,255,0.55)",
+                fontSize: 12,
+                fontFamily: "inherit",
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+              }}
+            >
+              {showKey ? "Hide" : "Show"}
+            </button>
+          </div>
+        </div>
+
+        {/* Action buttons row */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <button
+            data-testid="settings-rapidapi-test-btn"
+            onClick={handleTestRapidApiKey}
+            disabled={rapidApiTesting || !rapidApiKey.trim()}
+            style={{
+              ...actionBtnStyle,
+              opacity: rapidApiTesting || !rapidApiKey.trim() ? 0.5 : 1,
+            }}
+          >
+            {rapidApiTesting ? "Testing…" : "Test Key"}
+          </button>
+
+          <button
+            data-testid="settings-rapidapi-save-btn"
+            onClick={handleSaveRapidApiKey}
+            disabled={rapidApiSaving || !rapidApiKey.trim()}
+            style={{
+              ...actionBtnStyle,
+              background: rapidApiSaving || !rapidApiKey.trim() ? "rgba(29,185,255,0.15)" : "rgba(29,185,255,0.20)",
+              border: "1px solid rgba(29,185,255,0.35)",
+              color: "#1DB9FF",
+              opacity: rapidApiSaving || !rapidApiKey.trim() ? 0.6 : 1,
+            }}
+          >
+            {rapidApiSaving ? "Saving…" : "Save Key"}
+          </button>
+
+          {/* Test result inline */}
+          {rapidApiTestResult && (
+            <span
+              data-testid="settings-rapidapi-test-result"
+              style={rapidApiTestResult.ok ? toastStyle : errorStyle}
+            >
+              {rapidApiTestResult.ok
+                ? "✓ Key valid"
+                : rapidApiTestResult.error ?? "Key invalid"}
+            </span>
+          )}
+        </div>
+
+        {/* Remove key link — only visible when configured */}
+        {rapidApiStatus?.configured && (
+          <button
+            data-testid="settings-rapidapi-remove-btn"
+            onClick={handleDeleteRapidApiKey}
+            style={{
+              background: "none",
+              border: "none",
+              padding: 0,
+              color: "#FF5757",
+              fontSize: 12,
+              fontFamily: "inherit",
+              cursor: "pointer",
+              alignSelf: "flex-start",
+              textDecoration: "underline",
+              textUnderlineOffset: 2,
+            }}
+          >
+            Remove Key
+          </button>
+        )}
       </div>
 
       {/* ── App Info section ────────────────────────────────────────────────── */}

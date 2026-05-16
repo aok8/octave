@@ -61,3 +61,61 @@ pub async fn get_ai_status() -> Result<Value, String> {
         .map_err(|e| format!("Failed to reach sidecar: {e}"))?;
     check_response(resp).await
 }
+
+/// Save the RapidAPI key for audio feature enrichment.
+/// Proxies to `POST /settings/rapidapi-key` on the Python sidecar.
+#[tauri::command]
+pub async fn save_rapidapi_key(key: String) -> Result<Value, String> {
+    let url = format!("{}/settings/rapidapi-key", sidecar_base());
+    let client = Client::new();
+    let resp = client
+        .post(&url)
+        .json(&serde_json::json!({ "key": key }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach sidecar: {e}"))?;
+    check_response(resp).await
+}
+
+/// Return RapidAPI key configuration status.
+/// Proxies to `GET /settings/rapidapi-key/status` on the Python sidecar.
+#[tauri::command]
+pub async fn get_rapidapi_status() -> Result<Value, String> {
+    let url = format!("{}/settings/rapidapi-key/status", sidecar_base());
+    let client = Client::new();
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach sidecar: {e}"))?;
+    check_response(resp).await
+}
+
+/// Remove the stored RapidAPI key.
+/// Proxies to `DELETE /settings/rapidapi-key` on the Python sidecar.
+#[tauri::command]
+pub async fn delete_rapidapi_key() -> Result<Value, String> {
+    let url = format!("{}/settings/rapidapi-key", sidecar_base());
+    let client = Client::new();
+    let resp = client
+        .delete(&url)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach sidecar: {e}"))?;
+    check_response(resp).await
+}
+
+/// Test a RapidAPI key with a live API call.
+/// Proxies to `POST /settings/test-rapidapi` on the Python sidecar.
+#[tauri::command]
+pub async fn test_rapidapi_key(key: String) -> Result<Value, String> {
+    let url = format!("{}/settings/test-rapidapi", sidecar_base());
+    let client = Client::new();
+    let resp = client
+        .post(&url)
+        .json(&serde_json::json!({ "key": key }))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach sidecar: {e}"))?;
+    check_response(resp).await
+}

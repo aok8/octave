@@ -34,18 +34,32 @@ export function ErrorState({ message, onRetry }: ErrorStateProps) {
         />
       </svg>
 
-      {/* Message */}
-      <p
+      {/* Message — split on \n so multi-line diagnostic details render correctly */}
+      <div
         style={{
           fontSize: 14,
           color: "rgba(255,255,255,0.60)",
           margin: 0,
-          maxWidth: 320,
+          maxWidth: 480,
           lineHeight: 1.5,
+          textAlign: "center",
         }}
       >
-        {message}
-      </p>
+        {message.split("\n").map((line, i) => (
+          <p
+            key={i}
+            style={{
+              margin: i === 0 ? 0 : "6px 0 0",
+              fontSize: i === 0 ? 14 : 11,
+              color: i === 0 ? "rgba(255,255,255,0.60)" : "rgba(255,255,255,0.30)",
+              fontFamily: i === 0 ? "inherit" : "monospace",
+              wordBreak: "break-all",
+            }}
+          >
+            {line}
+          </p>
+        ))}
+      </div>
 
       {/* Retry button */}
       {onRetry && (

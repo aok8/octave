@@ -76,7 +76,11 @@ export function SeedPlaylist({ onBack, onAnalyze }: SeedPlaylistProps) {
       });
       setTracks(data.map(normalizeTrack));
     } catch (err) {
-      setTracksError("Could not load tracks for this playlist.");
+      // Surface the raw error so production failures are diagnosable.
+      // The sidecar detail (e.g. "Sidecar returned HTTP 500: ...") is
+      // included so the user can report exactly what went wrong.
+      const detail = String(err);
+      setTracksError(`Could not load tracks for this playlist.\n\n${detail}`);
     } finally {
       setTracksLoading(false);
     }

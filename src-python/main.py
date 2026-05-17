@@ -53,7 +53,49 @@ app.include_router(playlists_root_router, tags=["playlists"])
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "version": "2.0.0"}
+    """Liveness + readiness check.
+
+    Returns DB schema info so callers can verify that all migrations have been
+    applied.  This is intentionally cheap (one PRAGMA per table) and safe to
+    call frequently.
+
+    ``status`` is:
+      - ``"ok"``       — sidecar is running and DB is accessible (or not configured)
+      - ``"degraded"`` — sidecar is running but DB exists at the configured path yet
+                         cannot be opened / queried (genuine DB error)
+    """
+    import os
+    schema: dict = {}
+    db_error: str | None = None
+    db_path = os.environ.get("OCTAVE_DB_PATH")
+
+    if db_path:
+        # DB is expected to be present — check schema.
+        try:
+            from db import get_db
+            conn = get_db()
+            try:
+                for table in ("tracks", "playlists", "playlist_tracks", "audio_features",
+                              "recently_used", "interaction_log", "discovery_sessions",
+                              "ai_config"):
+                    try:
+                        cursor = conn.execute(f"PRAGMA table_info({table})")
+                        schema[table] = [row[1] for row in cursor.fetchall()]
+                    except Exception:
+                        schema[table] = None  # table doesn't exist yet
+            finally:
+                conn.close()
+        except Exception as exc:
+            db_error = str(exc)
+    # else: no DB path configured — that's fine for the health check (test envs).
+
+    return {
+        "status": "ok" if db_error is None else "degraded",
+        "version": "2.0.0",
+        **({"db_schema": schema} if db_path else {}),
+        **({"db_path": db_path} if db_path else {}),
+        **({"db_error": db_error} if db_error else {}),
+    }
 
 
 if __name__ == "__main__":

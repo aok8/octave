@@ -17,6 +17,45 @@ pub(super) fn sidecar_base() -> String {
     format!("http://127.0.0.1:{port}")
 }
 
+/// Sends a GET request with retry on connection errors.
+///
+/// The Python sidecar (PyInstaller EXE) can take several seconds to start,
+/// especially on the first launch when it must extract bundled files.  Rather
+/// than returning an immediate "connection refused" error we retry with
+/// exponential back-off so the user doesn't have to manually click Retry
+/// while the sidecar is still warming up.
+///
+/// Retries are limited to connection-level errors (`is_connect()`).  HTTP
+/// errors from a running sidecar (4xx / 5xx) are NOT retried — they mean the
+/// request was received and processed, just unsuccessfully.
+pub(super) async fn get_with_retry(client: &Client, url: &str) -> Result<reqwest::Response, String> {
+    const MAX_ATTEMPTS: u32 = 8;   // up to ~15 s total wait (400 + 800 + 1600 + … ms)
+    const BASE_DELAY_MS: u64 = 400;
+
+    let mut last_err = String::new();
+    for attempt in 0..MAX_ATTEMPTS {
+        if attempt > 0 {
+            // Capped exponential back-off: 400, 800, 1600, 3200, 3200, … ms
+            let delay = BASE_DELAY_MS * (1u64 << attempt.min(3));
+            tokio::time::sleep(std::time::Duration::from_millis(delay)).await;
+        }
+        match client.get(url).send().await {
+            Ok(resp) => return Ok(resp),
+            Err(e) if e.is_connect() => {
+                last_err = format!(
+                    "Sidecar not ready yet (attempt {}/{}): {e}",
+                    attempt + 1,
+                    MAX_ATTEMPTS,
+                );
+                log::warn!("{last_err}");
+                // keep retrying
+            }
+            Err(e) => return Err(format!("Failed to reach sidecar: {e}")),
+        }
+    }
+    Err(format!("Sidecar did not become ready in time. Last error: {last_err}"))
+}
+
 /// Maps a reqwest error or an unexpected status code into a human-readable
 /// `String` that Tauri's `Result<_, String>` return type expects.
 pub(super) async fn check_response(resp: reqwest::Response) -> Result<Value, String> {
@@ -51,11 +90,7 @@ pub async fn fetch_playlists(force_refresh: Option<bool>) -> Result<Value, Strin
         urlencoding::encode(&token),
         force_refresh.unwrap_or(false),
     );
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to reach sidecar: {e}"))?;
+    let resp = get_with_retry(&client, &url).await?;
     check_response(resp).await
 }
 
@@ -76,11 +111,7 @@ pub async fn fetch_playlist_tracks(
         urlencoding::encode(&token),
         force_refresh.unwrap_or(false),
     );
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| format!("Failed to reach sidecar: {e}"))?;
+    let resp = get_with_retry(&client, &url).await?;
     check_response(resp).await
 }
 
